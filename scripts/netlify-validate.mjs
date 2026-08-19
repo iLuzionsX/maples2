@@ -23,6 +23,8 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
+await run('npm', ['run', 'test:animation:unit']);
+console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build']);
 await run('npx', ['playwright-core', 'install', 'chromium']);
 
@@ -35,11 +37,13 @@ try {
   await ready();
   await run('npm', ['run', 'test:movement']);
   console.log('MOVEMENT SUITE PASS');
+  await run('node', ['tests/rowan-animation-e2e.mjs']);
+  console.log('ROWAN ANIMATION BROWSER SUITE PASS');
   await run('node', ['scripts/visual-netlify.mjs']);
   console.log('VISUAL SUITE PASS');
   await run('node', ['scripts/performance-observe.mjs']);
   await run('node', ['scripts/perf-threshold.mjs']);
-  console.log('FULL-QUALITY PERFORMANCE A/B COMPLETE');
+  console.log('FULL-QUALITY PERFORMANCE A/B PASS');
   console.log('NETLIFY SHOWCASE VALIDATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
