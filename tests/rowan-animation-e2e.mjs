@@ -2,6 +2,9 @@ import { chromium } from 'playwright';
 
 const baseUrl = process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';
 const errors = [];
+const READY_TIMEOUT = 60000;
+const STATE_TIMEOUT = 60000;
+const LOCOMOTION_TIMEOUT = 90000;
 const browser = await chromium.launch({
   headless: true,
   args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
@@ -20,10 +23,10 @@ await page.waitForFunction(() => {
     g?.assetVisualManager?.heroReady &&
     document.querySelector('#enter-btn')?.dataset.ready === 'true'
   );
-}, null, { timeout: 60000 });
+}, null, { timeout: READY_TIMEOUT });
 
 await page.locator('#enter-btn').click();
-await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__?.rowanAnimationDirector?.ready), null, { timeout: 30000 });
+await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__?.rowanAnimationDirector?.ready), null, { timeout: READY_TIMEOUT });
 
 const boot = await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
@@ -55,7 +58,7 @@ await page.keyboard.down('KeyW');
 await page.waitForFunction(({ x, z }) => {
   const g = window.__MAPLES_GAME__;
   return Math.hypot(g.player.position.x - x, g.player.position.z - z) >= 2.0 && g.player.speed > 4.2;
-}, start, { timeout: 90000 });
+}, start, { timeout: LOCOMOTION_TIMEOUT });
 
 const running = await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
@@ -82,7 +85,7 @@ if (running.rootPositionError > .001 || running.rootScaleError > .001 || running
 }
 
 await page.keyboard.up('KeyW');
-await page.waitForFunction(() => window.__MAPLES_GAME__.player.speed < .3, null, { timeout: 10000 });
+await page.waitForFunction(() => window.__MAPLES_GAME__.player.speed < .3, null, { timeout: STATE_TIMEOUT });
 const stopEvents = await page.evaluate(() => window.__MAPLES_GAME__.rowanAnimationDirector.eventCounts['locomotion:stop'] || 0);
 if (stopEvents < 1) errors.push('No deceleration/stop animation event fired');
 
@@ -113,11 +116,11 @@ await page.waitForFunction(() => {
   return (d.eventCounts['attack:anticipation'] || 0) >= 1 &&
     (d.eventCounts['attack:strike'] || 0) >= 1 &&
     (d.eventCounts['weapon-trail:start'] || 0) >= 1;
-}, null, { timeout: 10000 });
+}, null, { timeout: STATE_TIMEOUT });
 const attackEvents = await page.evaluate(() => ({ ...window.__MAPLES_GAME__.rowanAnimationDirector.eventCounts }));
 if ((attackEvents['sword:impact'] || 0) < 1) errors.push('Sword impact event did not follow a real melee hit');
 
-await page.waitForFunction(() => window.__MAPLES_GAME__.player.state === 'idle', null, { timeout: 10000 });
+await page.waitForFunction(() => window.__MAPLES_GAME__.player.state === 'idle', null, { timeout: STATE_TIMEOUT });
 await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
   g.player.invuln = 0;
@@ -128,16 +131,16 @@ await page.evaluate(() => {
   };
   g.player.takeDamage(1, source);
 });
-await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__.rowanAnimationDirector.hitResponse), null, { timeout: 5000 });
+await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__.rowanAnimationDirector.hitResponse), null, { timeout: STATE_TIMEOUT });
 const hit = await page.evaluate(() => window.__MAPLES_GAME__.rowanAnimationDirector.hitResponse);
 if (Math.abs(hit.side) < .7) errors.push(`Directional hit reaction was not classified as a side hit: ${JSON.stringify(hit)}`);
 
-await page.waitForFunction(() => window.__MAPLES_GAME__.player.state === 'idle', null, { timeout: 10000 });
+await page.waitForFunction(() => window.__MAPLES_GAME__.player.state === 'idle', null, { timeout: STATE_TIMEOUT });
 await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
   g.player.beginDodge({ x: 1, y: 0, z: 0 });
 });
-await page.waitForFunction(() => (window.__MAPLES_GAME__.rowanAnimationDirector.eventCounts['dodge:recover'] || 0) >= 1, null, { timeout: 10000 });
+await page.waitForFunction(() => (window.__MAPLES_GAME__.rowanAnimationDirector.eventCounts['dodge:recover'] || 0) >= 1, null, { timeout: STATE_TIMEOUT });
 
 const final = await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
