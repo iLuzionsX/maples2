@@ -1,39 +1,63 @@
 import * as THREE from 'three';
 
+const SWORD_STYLE = {
+  color: 0xc6d7d1,
+  roughness: .18,
+  metalness: .86,
+  emissive: 0x44c6a5,
+  emissiveIntensity: .55,
+  rune: true,
+  sculpt: 'sword',
+};
+
 const PALETTE = {
   Knight_Body: {
-    color: 0x244d48, roughness: .78, metalness: .02, detail: 'cloth',
+    color: 0x244d48, roughness: .8, metalness: .02, detail: 'cloth',
   },
   Knight_ArmLeft: {
-    color: 0x6f5744, roughness: .74, metalness: .03, detail: 'leather',
+    color: 0x6f5744, roughness: .76, metalness: .03, detail: 'leather',
   },
   Knight_ArmRight: {
-    color: 0x6f5744, roughness: .74, metalness: .03, detail: 'leather',
+    color: 0x6f5744, roughness: .76, metalness: .03, detail: 'leather',
   },
   Knight_LegLeft: {
-    color: 0x183835, roughness: .82, metalness: .01, detail: 'cloth',
+    color: 0x183835, roughness: .84, metalness: .01, detail: 'cloth',
   },
   Knight_LegRight: {
-    color: 0x183835, roughness: .82, metalness: .01, detail: 'cloth',
+    color: 0x183835, roughness: .84, metalness: .01, detail: 'cloth',
   },
   Knight_Head: {
     color: 0xf1c8a8, roughness: .7, metalness: 0,
   },
   Knight_Helmet: {
-    color: 0x8b927f, roughness: .27, metalness: .72, accent: 0xc6a45b, sculpt: 'helmet',
+    color: 0x69736b,
+    accent: 0xc6a45b,
+    roughness: .26,
+    metalness: .76,
+    sculpt: 'helmet',
   },
   Knight_Cape: {
-    color: 0x762f35, roughness: .88, metalness: 0, emissive: 0x163e36,
-    emissiveIntensity: .12, detail: 'cloth', rune: true, sculpt: 'cape',
+    color: 0x762f35,
+    roughness: .9,
+    metalness: 0,
+    emissive: 0x163e36,
+    emissiveIntensity: .12,
+    detail: 'cloth',
+    rune: true,
+    sculpt: 'cape',
   },
   Round_Shield: {
-    color: 0x263e3b, roughness: .38, metalness: .38, emissive: 0x1e6f5d,
-    emissiveIntensity: .24, accent: 0xc6a45b, rune: true, sculpt: 'shield',
+    color: 0x263e3b,
+    accent: 0xc6a45b,
+    roughness: .38,
+    metalness: .4,
+    emissive: 0x1e6f5d,
+    emissiveIntensity: .24,
+    rune: true,
+    sculpt: 'shield',
   },
-  '1H_Sword': {
-    color: 0xc6d7d1, roughness: .18, metalness: .86, emissive: 0x44c6a5,
-    emissiveIntensity: .55, accent: 0x8b6a37, rune: true, sculpt: 'sword',
-  },
+  '1H_Sword': SWORD_STYLE,
+  '2H_Sword': SWORD_STYLE,
 };
 
 const shared = {
@@ -79,12 +103,14 @@ function makeSurfaceDetail(kind) {
     seed = (seed * 1664525 + 1013904223) >>> 0;
     return seed / 0xffffffff;
   };
+
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const weave = kind === 'cloth'
-        ? ((x % 4 === 0 || y % 4 === 0) ? 18 : 0)
-        : Math.sin(x * .7 + y * .35) * 7;
-      const value = THREE.MathUtils.clamp(198 + weave + (random() - .5) * 28, 150, 236);
+        ? ((x % 4 === 0 || y % 4 === 0) ? 10 : 0)
+        : Math.sin(x * .7 + y * .35) * 6;
+      const base = kind === 'cloth' ? 236 : 218;
+      const value = THREE.MathUtils.clamp(base + weave + (random() - .5) * 20, kind === 'cloth' ? 216 : 190, 255);
       const i = (y * size + x) * 4;
       data[i] = value;
       data[i + 1] = value;
@@ -92,6 +118,7 @@ function makeSurfaceDetail(kind) {
       data[i + 3] = 255;
     }
   }
+
   const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   texture.repeat.set(kind === 'cloth' ? 5 : 3, kind === 'cloth' ? 7 : 4);
@@ -121,6 +148,7 @@ function styleMaterial(material, style, hasUv) {
   if ('roughness' in material && style.roughness != null) material.roughness = style.roughness;
   if ('metalness' in material && style.metalness != null) material.metalness = style.metalness;
   if ('envMapIntensity' in material) material.envMapIntensity = style.metalness > .3 ? 1.18 : .72;
+  if ('aoMapIntensity' in material) material.aoMapIntensity = .9;
 
   if (hasUv && style.detail && 'roughnessMap' in material) {
     material.roughnessMap = getSurfaceDetail(style.detail);
@@ -162,37 +190,35 @@ function sculptGeometry(node, kind) {
     v.fromBufferAttribute(position, i);
     const nx = size.x > 1e-6 ? (v.x - center.x) / (size.x * .5) : 0;
     const ny = size.y > 1e-6 ? (v.y - box.min.y) / size.y : .5;
-    const nz = size.z > 1e-6 ? (v.z - center.z) / (size.z * .5) : 0;
 
     if (kind === 'helmet') {
-      if (ny > .58) {
-        const crown = (ny - .58) / .42;
-        const ridge = 1 - THREE.MathUtils.clamp(Math.abs(nx) * .78, 0, 1);
-        v.y += size.y * .115 * crown * (.42 + ridge * .58);
-        v.x *= 1 + .045 * crown;
+      if (ny > .55) {
+        const crown = (ny - .55) / .45;
+        const ridge = 1 - THREE.MathUtils.clamp(Math.abs(nx) * .82, 0, 1);
+        v.y += size.y * .16 * crown * (.38 + ridge * .62);
+        v.x = center.x + (v.x - center.x) * (1 + .055 * crown);
       }
-      if (Math.abs(nx) > .72 && ny > .4) v.x *= 1.035;
+      if (Math.abs(nx) > .72 && ny > .4) {
+        v.x = center.x + (v.x - center.x) * 1.035;
+      }
     }
 
-    if (kind === 'cape') {
-      if (ny < .38) {
-        const hem = 1 - ny / .38;
-        v.x = center.x + (v.x - center.x) * (1 + hem * .16);
-        if (Math.abs(nx) < .26 && ny < .15) {
-          const notch = (1 - Math.abs(nx) / .26) * (1 - ny / .15);
-          v.y += size.y * .13 * notch;
-        }
+    if (kind === 'cape' && ny < .4) {
+      const hem = 1 - ny / .4;
+      v.x = center.x + (v.x - center.x) * (1 + hem * .18);
+      if (Math.abs(nx) < .27 && ny < .16) {
+        const notch = (1 - Math.abs(nx) / .27) * (1 - ny / .16);
+        v.y += size.y * .14 * notch;
       }
     }
 
     if (kind === 'shield') {
-      const angle = Math.atan2(nz, nx);
-      const facet = 1 + Math.cos(angle * 6 + Math.PI / 6) * .035;
-      v.x = center.x + (v.x - center.x) * facet;
-      v.z = center.z + (v.z - center.z) * facet;
-      if (ny < .28) {
-        const taper = THREE.MathUtils.lerp(.86, 1, ny / .28);
+      if (ny < .34) {
+        const taper = THREE.MathUtils.lerp(.7, 1, ny / .34);
         v.x = center.x + (v.x - center.x) * taper;
+      } else if (ny > .82) {
+        const shoulder = THREE.MathUtils.lerp(1, .94, (ny - .82) / .18);
+        v.x = center.x + (v.x - center.x) * shoulder;
       }
     }
 
@@ -203,7 +229,7 @@ function sculptGeometry(node, kind) {
       const extent = dimensions[major] || 1;
       const c = major === 0 ? v.x : major === 1 ? v.y : v.z;
       const t = THREE.MathUtils.clamp((c - min) / extent, 0, 1);
-      const leaf = .965 + Math.sin(Math.PI * t) * .085;
+      const leaf = .955 + Math.sin(Math.PI * t) * .105;
       if (major !== 0) v.x = center.x + (v.x - center.x) * leaf;
       if (major !== 1) v.y = center.y + (v.y - center.y) * leaf;
       if (major !== 2) v.z = center.z + (v.z - center.z) * leaf;
@@ -220,13 +246,54 @@ function sculptGeometry(node, kind) {
   return true;
 }
 
-function addMaterialAccent(node, style) {
-  if (!style.accent || !node?.material) return;
+function addVertexAccent(node, style) {
+  if (!style.accent || !node?.geometry?.attributes?.position || !node.material) return false;
+  const geometry = node.geometry;
+  geometry.computeBoundingBox();
+  const box = geometry.boundingBox;
+  if (!box) return false;
+
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const position = geometry.attributes.position;
+  const colors = new Float32Array(position.count * 3);
+  const base = new THREE.Color(style.color);
+  const accent = new THREE.Color(style.accent);
+  const mixed = new THREE.Color();
+  const v = new THREE.Vector3();
+
+  for (let i = 0; i < position.count; i++) {
+    v.fromBufferAttribute(position, i);
+    const nx = size.x > 1e-6 ? Math.abs((v.x - center.x) / (size.x * .5)) : 0;
+    const ny = size.y > 1e-6 ? (v.y - box.min.y) / size.y : .5;
+    let weight = 0;
+
+    if (style.sculpt === 'helmet') {
+      const ridge = (1 - THREE.MathUtils.smoothstep(nx, .12, .42)) * THREE.MathUtils.smoothstep(ny, .5, .82);
+      const brim = THREE.MathUtils.smoothstep(nx, .72, .98) * (1 - THREE.MathUtils.smoothstep(ny, .6, .84));
+      weight = Math.max(ridge * .74, brim * .58);
+    } else if (style.sculpt === 'shield') {
+      const sideRim = THREE.MathUtils.smoothstep(nx, .76, .98);
+      const topRim = THREE.MathUtils.smoothstep(ny, .84, .98);
+      const bottomRim = 1 - THREE.MathUtils.smoothstep(ny, .04, .2);
+      weight = Math.max(sideRim, topRim, bottomRim) * .78;
+    }
+
+    mixed.copy(base).lerp(accent, THREE.MathUtils.clamp(weight, 0, 1));
+    colors[i * 3] = mixed.r;
+    colors[i * 3 + 1] = mixed.g;
+    colors[i * 3 + 2] = mixed.b;
+  }
+
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
   const materials = Array.isArray(node.material) ? node.material : [node.material];
   for (const material of materials) {
-    if (!material?.color || !material.userData?.rowanStyled) continue;
-    material.userData.rowanAccent = style.accent;
+    if (!material?.color) continue;
+    material.color.setHex(0xffffff);
+    material.vertexColors = true;
+    material.needsUpdate = true;
   }
+  return true;
 }
 
 function applyRowanLook(player) {
@@ -240,12 +307,13 @@ function applyRowanLook(player) {
     if (!style) return;
     styleNode(node, style);
     if (style.sculpt) sculptGeometry(node, style.sculpt);
-    addMaterialAccent(node, style);
+    addVertexAccent(node, style);
   });
 
   // Keep Rowan readable in bloom without adding another dynamic light to the scene.
-  const sword = model.getObjectByName('1H_Sword');
-  if (sword?.material) {
+  for (const swordName of ['1H_Sword', '2H_Sword']) {
+    const sword = model.getObjectByName(swordName);
+    if (!sword?.material) continue;
     const materials = Array.isArray(sword.material) ? sword.material : [sword.material];
     for (const material of materials) {
       if ('emissiveIntensity' in material) material.emissiveIntensity = Math.max(material.emissiveIntensity || 0, .55);
