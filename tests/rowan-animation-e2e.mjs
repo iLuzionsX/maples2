@@ -19,8 +19,10 @@ page.on('console', msg => {
 await page.goto(`${baseUrl}/?quality=high&capture=1`, { waitUntil: 'networkidle' });
 await page.waitForFunction(() => {
   const g = window.__MAPLES_GAME__;
+  const importedEnemyReady = g?.enemies?.some(enemy => !enemy.dead && !enemy.isBoss && enemy.assetVisual);
   return Boolean(
     g?.assetVisualManager?.heroReady &&
+    importedEnemyReady &&
     document.querySelector('#enter-btn')?.dataset.ready === 'true'
   );
 }, null, { timeout: READY_TIMEOUT });
@@ -102,12 +104,11 @@ await page.evaluate(() => {
   g.player.root.rotation.y = Math.PI;
   g.cameraYaw = Math.PI;
   const enemy = g.enemies.find(e => !e.dead && !e.isBoss && e.assetVisual);
-  if (enemy) {
-    enemy.position.set(0, 0, 3.45);
-    enemy.state = 'idle';
-    enemy.stateTime = 0;
-    enemy.velocity.set(0, 0, 0);
-  }
+  if (!enemy) throw new Error('Rowan melee validation requires an imported enemy target');
+  enemy.position.set(0, 0, 3.45);
+  enemy.state = 'idle';
+  enemy.stateTime = 0;
+  enemy.velocity.set(0, 0, 0);
 });
 await page.waitForTimeout(80);
 await page.mouse.click(640, 360);
