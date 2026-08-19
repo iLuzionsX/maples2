@@ -116,6 +116,10 @@ async function freezeAndNormalize(page) {
     g.player.root.visible = true;
     g.player.root.rotation.y = 0;
     g.scene.updateMatrixWorld(true);
+    g.camera.updateMatrixWorld(true);
+    // The animation loop is stopped for the frozen A/B scene, so synchronize the
+    // optimized nature batches explicitly after normalizing the authored wind pose.
+    g.natureInstancingManager?.sync?.();
   });
 }
 
@@ -133,7 +137,8 @@ async function snapshot(page) {
     g.scene.traverse(node => {
       if (node.isLight && node.visible) visibleLights++;
       if (node.isDirectionalLight && node.castShadow) shadowMaps.push([node.shadow.mapSize.x, node.shadow.mapSize.y]);
-      if (!node.isMesh || !node.geometry) return;
+      // Hidden source meshes are retained only as exact culling proxies and do not render.
+      if (!node.isMesh || !node.geometry || !node.visible) return;
       sceneMeshes++;
       if (node.isInstancedMesh) instancedMeshes++;
       const geometry = node.geometry;
@@ -253,7 +258,8 @@ const browser = await chromium.launch({
 
 let report;
 try {
-  const context = await browser.newContext({ viewport: { width: 800, height: 450 }, deviceScaleFactor: 1 });
+  // Device DPR 2 drives Game's authored high preset to its 1.8 renderer cap.
+  const context = await browser.newContext({ viewport: { width: 800, height: 450 }, deviceScaleFactor: 2 });
   await context.addInitScript(() => {
     let seed = 0x5eed1234;
     Math.random = () => {
