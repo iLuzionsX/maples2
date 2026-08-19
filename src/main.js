@@ -13,6 +13,7 @@ import { installShowcasePass } from './game/ShowcasePass.js';
 import { installAnimationPolish } from './game/AnimationPolish.js';
 import { installShowcaseQualityGate } from './game/ShowcaseQualityGate.js';
 import { installPerformancePass } from './game/PerformancePass.js';
+import { installNatureInstancing } from './game/NatureInstancing.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -47,8 +48,11 @@ function waitForCoreVisuals(timeoutMs = 15000) {
   });
 }
 
-Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(() => {
-  performancePass?.rebatch();
+Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(async () => {
+  if (performancePass) {
+    performancePass.rebatch();
+    await installNatureInstancing(game);
+  }
   enterButton.textContent = 'Enter the Glade';
   enterButton.disabled = false;
   enterButton.dataset.ready = 'true';
