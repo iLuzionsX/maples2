@@ -95,6 +95,9 @@ function batchStaticDecor(game, stats, records) {
 
   decor.traverse(mesh => {
     if (!mesh.isMesh || isDynamicMesh(mesh, game, dynamicRoots)) return;
+    // A caster can affect visible pixels while outside the main camera frustum. Keep
+    // those meshes on Three.js' native render/shadow path rather than approximating.
+    if (mesh.castShadow) return;
 
     const geometryKey = geometrySignature(mesh.geometry);
     const materialKey = materialSignature(mesh.material);
