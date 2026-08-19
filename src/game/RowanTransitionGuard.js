@@ -1,18 +1,49 @@
 const TRANSITION_SPEED = .42;
 const NON_LOCOMOTION_STATES = new Set(['attack', 'dodge', 'hurt', 'cast', 'dead']);
+const TRANSITION_DURATIONS = { start: .25, stop: .28, turn: .23, dodgeRecovery: .23 };
 
 function locomotionEligible(player, state = player?.state) {
   return Boolean(player && !player.dead && !NON_LOCOMOTION_STATES.has(state));
 }
 
+function clearFootContacts(manager) {
+  const foot = manager.state?.foot;
+  for (const contact of [foot?.left, foot?.right]) {
+    if (!contact) continue;
+    contact.lock = null;
+    contact.hit = null;
+  }
+  manager.footIKActive = false;
+}
+
+function clearNonLocomotionPulses(manager) {
+  const state = manager.state;
+  if (!state) return;
+  state.startElapsed = Math.max(state.startElapsed, TRANSITION_DURATIONS.start);
+  state.stopElapsed = Math.max(state.stopElapsed, TRANSITION_DURATIONS.stop);
+  state.turnElapsed = Math.max(state.turnElapsed, TRANSITION_DURATIONS.turn);
+}
+
 export function installFrameInvariantRowanTransitions(game, manager) {
   if (!game?.player || !manager?.events) return manager;
 
+  let updateContext = null;
   const rawEmit = manager.events.emit.bind(manager.events);
   manager.events.emit = (type, detail = {}) => {
-    if ((type === 'locomotion:start' || type === 'locomotion:stop') && !locomotionEligible(game.player)) {
+    const currentLocomotionEligible = locomotionEligible(game.player);
+    const startedInLocomotion = updateContext?.startedInLocomotion ?? currentLocomotionEligible;
+
+    if (
+      ['locomotion:start', 'locomotion:stop', 'locomotion:direction-change'].includes(type) &&
+      (!currentLocomotionEligible || !startedInLocomotion)
+    ) {
       return { type, suppressed: true, ...detail };
     }
+
+    if (type === 'dodge:recover' && game.player.state !== 'idle') {
+      return { type, suppressed: true, ...detail };
+    }
+
     return rawEmit(type, detail);
   };
 
@@ -21,19 +52,34 @@ export function installFrameInvariantRowanTransitions(game, manager) {
     const dt = Math.max(.0001, args[0] || 0);
     const previousSpeed = game.player.speed || 0;
     const previousState = game.player.state;
+    const startedInLocomotion = locomotionEligible(game.player, previousState);
     const startCount = manager.eventCounts['locomotion:start'] || 0;
     const stopCount = manager.eventCounts['locomotion:stop'] || 0;
 
-    const result = baseUpdate(...args);
+    // A planted contact from the takeoff pose must never survive into a dodge frame.
+    if (previousState === 'dodge') clearFootContacts(manager);
 
+    updateContext = { previousState, startedInLocomotion };
+    let result;
+    try {
+      result = baseUpdate(...args);
+    } finally {
+      updateContext = null;
+    }
+
+    const currentState = game.player.state;
     const currentSpeed = game.player.speed || 0;
     const acceleration = (currentSpeed - previousSpeed) / dt;
     const state = manager.state;
-    const eligible = locomotionEligible(game.player) && locomotionEligible(game.player, previousState);
+    const eligible = startedInLocomotion && locomotionEligible(game.player, currentState);
+
+    if (currentState === 'dodge' || previousState === 'dodge') clearFootContacts(manager);
 
     if (state && !eligible) {
-      state.startElapsed = Math.max(state.startElapsed, .25);
-      state.stopElapsed = Math.max(state.stopElapsed, .28);
+      clearNonLocomotionPulses(manager);
+      if (previousState === 'dodge' && currentState !== 'idle') {
+        state.dodgeRecoveryElapsed = Math.max(state.dodgeRecoveryElapsed, TRANSITION_DURATIONS.dodgeRecovery);
+      }
       return result;
     }
 
@@ -63,5 +109,6 @@ export function installFrameInvariantRowanTransitions(game, manager) {
   };
 
   manager.frameInvariantTransitions = true;
+  manager.transitionStateIsolation = true;
   return manager;
 }
