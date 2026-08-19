@@ -2,12 +2,14 @@ import * as THREE from 'three';
 
 const _inverseRoot = new THREE.Matrix4();
 const _instanceMatrix = new THREE.Matrix4();
+const _projection = new THREE.Matrix4();
+const _frustum = new THREE.Frustum();
 
 function canInstance(mesh) {
   if (!mesh?.isMesh || mesh.isSkinnedMesh || mesh.isInstancedMesh || !mesh.visible) return false;
   if (!mesh.geometry || mesh.geometry.morphAttributes && Object.values(mesh.geometry.morphAttributes).some(list => list?.length)) return false;
   const material = mesh.material;
-  if (!material || Array.isArray(material)) return false;
+  if (!material || Array.isArray(material) || material.visible === false) return false;
   if (material.transparent || material.opacity < .999 || material.blending !== THREE.NormalBlending) return false;
   return true;
 }
@@ -27,6 +29,7 @@ function collectSlots(root) {
       receiveShadow: mesh.receiveShadow,
       renderOrder: mesh.renderOrder,
       layers: mesh.layers.mask,
+      alwaysVisible: mesh.frustumCulled === false,
     });
   });
   return slots;
@@ -40,15 +43,21 @@ function slotCompatible(a, b) {
     a.layers === b.layers);
 }
 
-function updateBatchMatrices(batchRecord) {
+function updateBatchMatrices(batchRecord, frustum = null) {
   const { batch, entries } = batchRecord;
+  let visibleCount = 0;
+
   for (let i = 0; i < entries.length; i++) {
-    const { root, relative } = entries[i];
-    root.updateMatrix();
+    const { root, relative, mesh, alwaysVisible } = entries[i];
+    if (frustum && !alwaysVisible && !frustum.intersectsObject(mesh)) continue;
     _instanceMatrix.multiplyMatrices(root.matrix, relative);
-    batch.setMatrixAt(i, _instanceMatrix);
+    batch.setMatrixAt(visibleCount++, _instanceMatrix);
   }
-  batch.instanceMatrix.needsUpdate = true;
+
+  batch.count = visibleCount;
+  batch.visible = visibleCount > 0;
+  if (visibleCount > 0) batch.instanceMatrix.needsUpdate = true;
+  return visibleCount;
 }
 
 export async function installNatureInstancing(game) {
@@ -58,11 +67,30 @@ export async function installNatureInstancing(game) {
   const result = game.natureInstancingManager = {
     ready: false,
     batches: [],
+    roots: [],
     sourceMeshesHidden: 0,
     estimatedDrawCallsSaved: 0,
     skippedSlots: 0,
+    visibleInstances: 0,
+    culledInstances: 0,
     sync() {
-      for (const record of result.batches) updateBatchMatrices(record);
+      if (!result.batches.length) return;
+
+      // Every nature root can feed multiple mesh-slot batches. Update each root matrix
+      // once per frame instead of repeating the same work for every slot.
+      for (const root of result.roots) root.updateMatrix();
+
+      _projection.multiplyMatrices(game.camera.projectionMatrix, game.camera.matrixWorldInverse);
+      _frustum.setFromProjectionMatrix(_projection);
+
+      let visibleInstances = 0;
+      let totalInstances = 0;
+      for (const record of result.batches) {
+        totalInstances += record.entries.length;
+        visibleInstances += updateBatchMatrices(record, _frustum);
+      }
+      result.visibleInstances = visibleInstances;
+      result.culledInstances = totalInstances - visibleInstances;
     },
   };
 
@@ -77,7 +105,8 @@ export async function installNatureInstancing(game) {
 
   const decor = game.world.decor;
   const byKind = new Map();
-  for (const root of manager.instances) {
+  result.roots = [...manager.instances];
+  for (const root of result.roots) {
     const kind = root.userData.kind || 'nature';
     if (!byKind.has(kind)) byKind.set(kind, []);
     byKind.get(kind).push(root);
@@ -111,17 +140,23 @@ export async function installNatureInstancing(game) {
         batch.receiveShadow = first.receiveShadow;
         batch.renderOrder = first.renderOrder;
         batch.layers.mask = first.layers;
-        batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        // We compact the batch using the exact source-mesh frustum test before every render.
+        batch.frustumCulled = false;
+        batch.instanceMatrix.setUsage(THREE.StreamDrawUsage);
         batch.userData.performanceNatureBatch = true;
         decor.add(batch);
 
         const record = {
           batch,
-          entries: entriesForFlags.map(({ root, slot }) => ({ root, relative: slot.relative })),
+          entries: entriesForFlags.map(({ root, slot }) => ({
+            root,
+            relative: slot.relative,
+            mesh: slot.mesh,
+            alwaysVisible: slot.alwaysVisible,
+          })),
         };
+        for (const root of roots) root.updateMatrix();
         updateBatchMatrices(record);
-        batch.computeBoundingBox();
-        batch.computeBoundingSphere();
         result.batches.push(record);
 
         for (const { slot } of entriesForFlags) {
@@ -135,8 +170,7 @@ export async function installNatureInstancing(game) {
 
   if (result.batches.length) {
     // Sync immediately before rendering. This preserves every authored wind/root transform,
-    // avoids coupling to the chain of world.update wrappers, and also makes frozen visual
-    // comparisons exact after a test or cinematic directly changes a source transform.
+    // while per-source frustum tests preserve the original off-screen triangle culling.
     const previousSceneBeforeRender = game.scene.onBeforeRender;
     game.scene.onBeforeRender = function (...args) {
       previousSceneBeforeRender?.apply(this, args);
