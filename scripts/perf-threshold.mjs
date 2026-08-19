@@ -40,5 +40,9 @@ const progress = {
   liveFpsFloorMet: (report.liveFpsImprovementPct ?? -Infinity) >= targets.liveFpsRegressionFloorPct,
 };
 
+if (!progress.drawCallTargetMet) failures.push(`draw-call reduction ${report.drawCallReductionPct}% < ${targets.drawCallReductionPct}%`);
+if (!progress.renderTargetMet) failures.push(`render improvement ${report.renderImprovementPct}% < ${targets.renderImprovementPct}%`);
+if (!progress.liveFpsFloorMet) failures.push(`live FPS change ${report.liveFpsImprovementPct}% < ${targets.liveFpsRegressionFloorPct}% floor`);
+
 console.log('PERFORMANCE QUALITY GATE', JSON.stringify({ targets, progress, failures }, null, 2));
 if (failures.length) process.exit(1);
