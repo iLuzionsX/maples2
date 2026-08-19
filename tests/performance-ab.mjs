@@ -194,48 +194,12 @@ async function snapshot(page) {
   });
 }
 
-async function isolatedRenderTimes(page, iterations = 4) {
-  return page.evaluate(count => {
-    const g = window.__MAPLES_GAME__;
-    const renderer = g.renderer;
-    const gl = renderer.getContext();
-    const values = [];
-    for (let i = 0; i < 2; i++) { g._render(); gl.finish(); }
-    for (let i = 0; i < count; i++) {
-      const start = performance.now();
-      g._render();
-      gl.finish();
-      values.push(performance.now() - start);
-    }
-    return values;
-  }, iterations);
-}
-
-async function liveFrameTimes(page, frames = 24) {
-  await page.locator('#enter-btn').click();
-  await page.evaluate(() => window.__MAPLES_GAME__.start());
-  const result = await page.evaluate(async count => {
-    const deltas = [];
-    let last = await new Promise(resolve => requestAnimationFrame(resolve));
-    for (let i = 0; i < count + 5; i++) {
-      const now = await new Promise(resolve => requestAnimationFrame(resolve));
-      if (i >= 5) deltas.push(now - last);
-      last = now;
-    }
-    return deltas;
-  }, frames);
-  await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
-  return result;
-}
-
-async function runCase(page, optimized) {
+async function prepareCase(page, optimized) {
   const url = `${baseUrl}/?quality=high${optimized ? '' : '&perf=off'}`;
   await page.goto(url, { waitUntil: 'networkidle' });
   await waitReady(page);
   await freezeAndNormalize(page);
   const frozen = await snapshot(page);
-  const renderTimes = await isolatedRenderTimes(page);
-  const liveTimes = await liveFrameTimes(page);
   return {
     mode: optimized ? 'optimized' : 'baseline',
     quality: frozen.quality,
@@ -245,10 +209,65 @@ async function runCase(page, optimized) {
     calls: frozen.calls,
     renderedTriangles: frozen.renderedTriangles,
     fingerprint: frozen.fingerprint,
-    renderMedianMs: median(renderTimes),
-    liveMedianMs: median(liveTimes),
-    liveMedianFps: 1000 / median(liveTimes),
   };
+}
+
+async function warmRender(page, count = 4) {
+  await page.evaluate(iterations => {
+    const g = window.__MAPLES_GAME__;
+    const gl = g.renderer.getContext();
+    for (let i = 0; i < iterations; i++) {
+      g._render();
+      gl.finish();
+    }
+  }, count);
+}
+
+async function oneRenderTime(page) {
+  return page.evaluate(() => {
+    const g = window.__MAPLES_GAME__;
+    const gl = g.renderer.getContext();
+    const start = performance.now();
+    g._render();
+    gl.finish();
+    return performance.now() - start;
+  });
+}
+
+async function interleavedRenderTimes(baselinePage, optimizedPage, pairs = 16) {
+  await warmRender(baselinePage);
+  await warmRender(optimizedPage);
+  const baseline = [];
+  const optimized = [];
+
+  for (let i = 0; i < pairs; i++) {
+    // Alternate which case runs first so thermal/JIT/scheduler drift is balanced.
+    if (i % 2 === 0) {
+      baseline.push(await oneRenderTime(baselinePage));
+      optimized.push(await oneRenderTime(optimizedPage));
+    } else {
+      optimized.push(await oneRenderTime(optimizedPage));
+      baseline.push(await oneRenderTime(baselinePage));
+    }
+  }
+  return { baseline, optimized };
+}
+
+async function liveFrameTimes(page, frames = 48) {
+  await page.locator('#enter-btn').click();
+  await page.evaluate(() => window.__MAPLES_GAME__.start());
+  const result = await page.evaluate(async count => {
+    const deltas = [];
+    let last = await new Promise(resolve => requestAnimationFrame(resolve));
+    for (let i = 0; i < count + 8; i++) {
+      const now = await new Promise(resolve => requestAnimationFrame(resolve));
+      if (i >= 8) deltas.push(now - last);
+      last = now;
+    }
+    return deltas;
+  }, frames);
+  await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
+  return result;
 }
 
 const browser = await chromium.launch({
@@ -270,13 +289,31 @@ try {
       return ((t ^ t >>> 14) >>> 0) / 4294967296;
     };
   });
-  const page = await context.newPage();
-  const errors = [];
-  page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
-  page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('favicon')) errors.push(`console: ${msg.text()}`); });
 
-  const baseline = await runCase(page, false);
-  const optimized = await runCase(page, true);
+  const errors = [];
+  const attachErrors = page => {
+    page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
+    page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('favicon')) errors.push(`console: ${msg.text()}`); });
+  };
+
+  const baselinePage = await context.newPage();
+  const optimizedPage = await context.newPage();
+  attachErrors(baselinePage);
+  attachErrors(optimizedPage);
+
+  const baseline = await prepareCase(baselinePage, false);
+  const optimized = await prepareCase(optimizedPage, true);
+  const renderSamples = await interleavedRenderTimes(baselinePage, optimizedPage, 16);
+  const baselineLive = await liveFrameTimes(baselinePage);
+  const optimizedLive = await liveFrameTimes(optimizedPage);
+
+  baseline.renderMedianMs = median(renderSamples.baseline);
+  optimized.renderMedianMs = median(renderSamples.optimized);
+  baseline.liveMedianMs = median(baselineLive);
+  optimized.liveMedianMs = median(optimizedLive);
+  baseline.liveMedianFps = 1000 / baseline.liveMedianMs;
+  optimized.liveMedianFps = 1000 / optimized.liveMedianMs;
+
   const visualDiff = compareFingerprint(baseline.fingerprint, optimized.fingerprint);
   delete baseline.fingerprint;
   delete optimized.fingerprint;
@@ -285,11 +322,12 @@ try {
   const renderImprovementPct = (baseline.renderMedianMs - optimized.renderMedianMs) / baseline.renderMedianMs * 100;
   const liveFpsImprovementPct = (optimized.liveMedianFps - baseline.liveMedianFps) / baseline.liveMedianFps * 100;
   const geometryDeltaPct = Math.abs(optimized.geometryTriangles - baseline.geometryTriangles) / Math.max(1, baseline.geometryTriangles) * 100;
+  const renderedTriangleDeltaPct = Math.abs(optimized.renderedTriangles - baseline.renderedTriangles) / Math.max(1, baseline.renderedTriangles) * 100;
   const qualityInvariant = JSON.stringify(baseline.quality) === JSON.stringify(optimized.quality);
 
   report = {
     generatedAt: new Date().toISOString(),
-    methodology: 'One Chromium process/page, deterministic RNG, authored high preset at renderer DPR 1.8, deterministic frozen-scene render test plus live idle-gameplay requestAnimationFrame sampling.',
+    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and authored high preset at renderer DPR 1.8. GPU-complete render timings are 16 interleaved baseline/optimized pairs with alternating order after warmup; live idle gameplay uses 48 post-warmup requestAnimationFrame samples per case.',
     errors,
     baseline,
     optimized,
@@ -297,14 +335,20 @@ try {
     renderImprovementPct,
     liveFpsImprovementPct,
     geometryDeltaPct,
+    renderedTriangleDeltaPct,
     qualityInvariant,
     visualDiff,
+    renderSamples: {
+      countPerCase: renderSamples.baseline.length,
+      baselineMedianMs: baseline.renderMedianMs,
+      optimizedMedianMs: optimized.renderMedianMs,
+    },
   };
 
   const failures = [];
   if (errors.length) failures.push(...errors);
   if (!qualityInvariant) failures.push('renderer/asset quality settings changed');
-  if (geometryDeltaPct > .01) failures.push(`scene geometry changed by ${geometryDeltaPct.toFixed(4)}%`);
+  if (renderedTriangleDeltaPct > .01) failures.push(`rendered geometry changed by ${renderedTriangleDeltaPct.toFixed(4)}%`);
   if (!visualDiff.comparable || visualDiff.changedPixelRatio > .03 || visualDiff.meanAbsoluteChannelDiff > .75) {
     failures.push(`frozen-scene pixel fingerprint changed too much: ${JSON.stringify(visualDiff)}`);
   }
