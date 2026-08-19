@@ -16,6 +16,15 @@ function clearFootContacts(manager) {
   manager.footIKActive = false;
 }
 
+function clearInterruptedComboCarry(manager) {
+  const carry = manager.state?.comboCarry;
+  if (!carry) return;
+  carry.action?.setEffectiveWeight?.(0);
+  if (carry.current) carry.current.setEffectiveWeight(1);
+  manager.state.comboCarry = null;
+  manager.comboCarryInterrupted = true;
+}
+
 function finishPulse(manager, type) {
   const state = manager.state;
   if (!state) return;
@@ -44,9 +53,6 @@ export function installFrameInvariantRowanTransitions(game, manager) {
       ['locomotion:start', 'locomotion:stop', 'locomotion:direction-change'].includes(type) &&
       (!currentLocomotionEligible || !startedInLocomotion)
     ) {
-      // The director may reset a pulse immediately before emitting. Restore the
-      // completed value when an action-state event is suppressed so it cannot
-      // leak into the next authored pose.
       finishPulse(manager, type);
       return { type, suppressed: true, ...detail };
     }
@@ -68,6 +74,9 @@ export function installFrameInvariantRowanTransitions(game, manager) {
     const startCount = manager.eventCounts['locomotion:start'] || 0;
     const stopCount = manager.eventCounts['locomotion:stop'] || 0;
 
+    // If gameplay has already interrupted an attack between frames, remove any
+    // residual combo blend before the director can sample it over hurt/dodge/cast.
+    if (previousState !== 'attack') clearInterruptedComboCarry(manager);
     if (previousState === 'dodge') clearFootContacts(manager);
 
     updateContext = { previousState, startedInLocomotion };
@@ -85,16 +94,13 @@ export function installFrameInvariantRowanTransitions(game, manager) {
     const eligible = startedInLocomotion && locomotionEligible(game.player, currentState);
 
     if (currentState === 'dodge' || previousState === 'dodge') clearFootContacts(manager);
+    if (currentState !== 'attack') clearInterruptedComboCarry(manager);
 
     if (state && !eligible) {
       clearNonLocomotionPulses(manager);
       if (previousState === 'dodge' && currentState !== 'idle') {
         finishPulse(manager, 'dodge:recover');
       }
-      // Do not re-sample the mixer here. RowanAnimationDirector now gates
-      // locomotion overlays before action poses and orders combo carry before
-      // the attack overlay, so a post-director mixer sample would erase the
-      // authored attack/hit corrections and foot placement.
       return result;
     }
 
