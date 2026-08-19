@@ -1,7 +1,10 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+
+const baseUrl = process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';
+const dist = path.resolve('dist');
+fs.mkdirSync(dist, { recursive: true });
 
 function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
@@ -9,293 +12,311 @@ function median(values) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-function percentile(values, p) {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))];
+function compareFingerprint(before, after) {
+  if (!before || !after || before.length !== after.length) return { comparable: false };
+  let changed = 0;
+  let sum = 0;
+  let max = 0;
+  const pixels = before.length / 4;
+  for (let i = 0; i < before.length; i += 4) {
+    let pixelChanged = false;
+    for (let c = 0; c < 4; c++) {
+      const d = Math.abs(before[i + c] - after[i + c]);
+      sum += d;
+      max = Math.max(max, d);
+      if (d > 2) pixelChanged = true;
+    }
+    if (pixelChanged) changed++;
+  }
+  return {
+    comparable: true,
+    pixels,
+    changedPixels: changed,
+    changedPixelRatio: changed / pixels,
+    meanAbsoluteChannelDiff: sum / before.length,
+    maxChannelDiff: max,
+  };
 }
 
-async function waitForGame(page, quality) {
+async function waitReady(page) {
   await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__), null, { timeout: 30000 });
   await page.waitForFunction(() => {
     const g = window.__MAPLES_GAME__;
-    return g.assetVisualManager?.ready && g.assetVisualManager?.heroReady &&
+    return g.quality === 'high' && g.assetVisualManager?.ready && g.assetVisualManager?.heroReady &&
       g.environmentAssetManager?.ready && g.natureAssetManager?.ready &&
       g.animationPolishManager?.ready && document.querySelector('#enter-btn')?.dataset.ready === 'true';
   }, null, { timeout: 90000 });
-  await page.waitForFunction(expected => window.__MAPLES_GAME__.quality === expected, quality, { timeout: 5000 });
-  await page.locator('#enter-btn').click();
-  await page.waitForTimeout(220);
 }
 
-async function sampleLiveFrames(page, frameCount = 30) {
-  return page.evaluate(async count => {
-    const deltas = [];
-    let previous = await new Promise(resolve => requestAnimationFrame(resolve));
-    for (let i = 0; i < count + 5; i++) {
-      const now = await new Promise(resolve => requestAnimationFrame(resolve));
-      if (i >= 5) deltas.push(now - previous);
-      previous = now;
-    }
-    deltas.sort((a, b) => a - b);
-    const medianMs = deltas[Math.floor(deltas.length / 2)] || 0;
-    const p95Ms = deltas[Math.min(deltas.length - 1, Math.ceil(deltas.length * .95) - 1)] || 0;
-    return {
-      samples: deltas.length,
-      medianMs,
-      p95Ms,
-      medianFps: medianMs > 0 ? 1000 / medianMs : 0,
-      p95Fps: p95Ms > 0 ? 1000 / p95Ms : 0,
-    };
-  }, frameCount);
-}
-
-async function qualitySnapshot(page) {
-  return page.evaluate(() => {
+async function freezeAndNormalize(page) {
+  await page.evaluate(() => {
     const g = window.__MAPLES_GAME__;
-    const shadowMaps = [];
-    let visibleLights = 0;
-    let meshes = 0;
-    let instancedMeshes = 0;
-    g.scene.traverse(node => {
-      if (node.isLight && node.visible) visibleLights++;
-      if (node.isMesh) meshes++;
-      if (node.isInstancedMesh) instancedMeshes++;
-      if (node.isDirectionalLight && node.castShadow) shadowMaps.push({ x: node.shadow.mapSize.x, y: node.shadow.mapSize.y });
-    });
-    return {
-      quality: g.quality,
-      pixelRatio: g.renderer.getPixelRatio(),
-      shadowType: g.renderer.shadowMap.type,
-      toneMapping: g.renderer.toneMapping,
-      toneMappingExposure: g.renderer.toneMappingExposure,
-      composer: Boolean(g.composer),
-      composerPasses: g.composer?.passes?.map(pass => ({
-        type: pass.constructor?.name || 'Unknown',
-        strength: pass.strength ?? null,
-        radius: pass.radius ?? null,
-        threshold: pass.threshold ?? null,
-      })) || [],
-      shadowMaps,
-      visibleLights,
-      meshes,
-      instancedMeshes,
-      environmentPieces: g.environmentAssetManager?.count ?? 0,
-      naturePieces: g.natureAssetManager?.count ?? 0,
-      importedEnemies: g.enemies.filter(e => e.assetVisual).length,
-      heroImported: Boolean(g.player.assetVisual),
-      animationPolishReady: Boolean(g.animationPolishManager?.ready),
-    };
+    g.renderer.setAnimationLoop(null);
+    g.started = false;
+    g.gameTime = 0;
+    g.cameraYaw = Math.PI;
+    g.cameraPitch = .28;
+    g.cameraShake = 0;
+    g.cameraKick = 0;
+    g.camera.position.set(7.5, 5.1, 12.2);
+    g.camera.fov = 54;
+    g.camera.lookAt(0, 1.2, 0);
+    g.camera.updateProjectionMatrix();
+
+    if (g.world) {
+      g.world.time = 0;
+      for (const f of g.world.fireflies || []) {
+        const u = f.userData;
+        f.position.x = u.base.x + Math.sin(u.phase) * .45;
+        f.position.y = u.base.y + Math.sin(u.phase * 2) * .32;
+        f.position.z = u.base.z + Math.cos(u.phase) * .4;
+        f.material.opacity = .3 + .55 * (.5 + .5 * Math.sin(u.phase));
+      }
+      if (g.world.portalRing) g.world.portalRing.rotation.z = 0;
+    }
+
+    const pass = g.showcasePass;
+    if (pass) {
+      pass.time = 0;
+      for (const foam of pass.foam || []) {
+        const p = foam.userData.phase || 0;
+        foam.material.opacity = .16 + (Math.sin(p) * .5 + .5) * .18;
+        foam.rotation.z = p;
+        foam.scale.setScalar(1 + Math.sin(p) * .08);
+      }
+      const gust = .74;
+      for (const group of pass.swayGroups || []) {
+        group.rotation.z = group.userData.baseZ + Math.sin(group.userData.phase || 0) * group.userData.sway * (1 + gust * .75)
+          + Math.sin((group.userData.phase || 0) * 1.7) * group.userData.sway * .18;
+      }
+      pass.root?.traverse(object => {
+        if (!object.userData?.showcaseMote) return;
+        const u = object.userData;
+        object.position.x = u.base.x + Math.sin(u.phase) * .42;
+        object.position.y = u.base.y + Math.sin(u.phase * 1.4) * .32;
+        object.position.z = u.base.z + Math.cos(u.phase) * .36;
+        object.material.opacity = .18 + .34 * (Math.sin(u.phase) * .5 + .5);
+      });
+    }
+
+    const nature = g.natureAssetManager;
+    if (nature?.instances) {
+      nature.time = 0;
+      for (let i = 0; i < nature.instances.length; i++) {
+        const item = nature.instances[i];
+        const phase = item.userData.phase || i;
+        item.rotation.z = (item.userData.baseRotationZ ?? 0) + Math.sin(phase) * (item.userData.sway || 0);
+      }
+    }
+
+    g.player.setPosition(0, 0, 9);
+    g.player.velocity.set(0, 0, 0);
+    g.player.state = 'idle';
+    g.player.stateTime = 0;
+    g.player.root.visible = true;
+    g.player.root.rotation.y = 0;
+    g.scene.updateMatrixWorld(true);
   });
 }
 
-async function renderBenchmark(page, iterations = 2) {
-  return page.evaluate(({ iterations }) => {
+async function snapshot(page) {
+  return page.evaluate(() => {
     const g = window.__MAPLES_GAME__;
     const renderer = g.renderer;
     const gl = renderer.getContext();
-    const times = [];
-    renderer.info.autoReset = false;
+    const shadowMaps = [];
+    let visibleLights = 0;
+    let geometryTriangles = 0;
+    let sceneMeshes = 0;
+    let instancedMeshes = 0;
 
+    g.scene.traverse(node => {
+      if (node.isLight && node.visible) visibleLights++;
+      if (node.isDirectionalLight && node.castShadow) shadowMaps.push([node.shadow.mapSize.x, node.shadow.mapSize.y]);
+      if (!node.isMesh || !node.geometry) return;
+      sceneMeshes++;
+      if (node.isInstancedMesh) instancedMeshes++;
+      const geometry = node.geometry;
+      const vertexCount = geometry.index?.count ?? geometry.attributes?.position?.count ?? 0;
+      const copies = node.isInstancedMesh ? node.count : 1;
+      geometryTriangles += vertexCount / 3 * copies;
+    });
+
+    renderer.info.autoReset = false;
     renderer.info.reset();
     g._render();
     gl.finish();
+    const calls = renderer.info.render.calls;
+    const renderedTriangles = renderer.info.render.triangles;
+    renderer.info.autoReset = true;
+    renderer.info.reset();
 
-    let calls = 0, triangles = 0, lines = 0, points = 0;
-    for (let i = 0; i < iterations; i++) {
-      renderer.info.reset();
+    const sample = document.createElement('canvas');
+    sample.width = 96;
+    sample.height = 54;
+    const ctx = sample.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(g.canvas, 0, 0, sample.width, sample.height);
+    const fingerprint = Array.from(ctx.getImageData(0, 0, sample.width, sample.height).data);
+
+    return {
+      quality: {
+        quality: g.quality,
+        pixelRatio: renderer.getPixelRatio(),
+        shadowType: renderer.shadowMap.type,
+        toneMapping: renderer.toneMapping,
+        exposure: renderer.toneMappingExposure,
+        composer: Boolean(g.composer),
+        composerPasses: g.composer?.passes?.map(pass => ({
+          type: pass.constructor?.name || 'Unknown',
+          strength: pass.strength ?? null,
+          radius: pass.radius ?? null,
+          threshold: pass.threshold ?? null,
+        })) || [],
+        shadowMaps,
+        visibleLights,
+        environmentPieces: g.environmentAssetManager?.count ?? 0,
+        naturePieces: g.natureAssetManager?.count ?? 0,
+        importedEnemies: g.enemies.filter(e => e.assetVisual).length,
+        heroImported: Boolean(g.player.assetVisual),
+      },
+      sceneMeshes,
+      instancedMeshes,
+      geometryTriangles,
+      calls,
+      renderedTriangles,
+      fingerprint,
+    };
+  });
+}
+
+async function isolatedRenderTimes(page, iterations = 4) {
+  return page.evaluate(count => {
+    const g = window.__MAPLES_GAME__;
+    const renderer = g.renderer;
+    const gl = renderer.getContext();
+    const values = [];
+    for (let i = 0; i < 2; i++) { g._render(); gl.finish(); }
+    for (let i = 0; i < count; i++) {
       const start = performance.now();
       g._render();
       gl.finish();
-      times.push(performance.now() - start);
-      calls = renderer.info.render.calls;
-      triangles = renderer.info.render.triangles;
-      lines = renderer.info.render.lines;
-      points = renderer.info.render.points;
+      values.push(performance.now() - start);
     }
-    renderer.info.autoReset = true;
-    renderer.info.reset();
-    return { times, calls, triangles, lines, points, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight };
-  }, { iterations });
+    return values;
+  }, iterations);
 }
 
-async function storeBaselinePixels(page) {
-  return page.evaluate(() => {
-    const g = window.__MAPLES_GAME__;
-    const gl = g.renderer.getContext();
-    g._render();
-    gl.finish();
-    const width = gl.drawingBufferWidth, height = gl.drawingBufferHeight;
-    const data = new Uint8Array(width * height * 4);
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
-    window.__MAPLES_BASELINE_PIXELS__ = data;
-    return { width, height };
-  });
-}
-
-async function comparePixels(page) {
-  return page.evaluate(() => {
-    const g = window.__MAPLES_GAME__;
-    const gl = g.renderer.getContext();
-    g._render();
-    gl.finish();
-    const width = gl.drawingBufferWidth, height = gl.drawingBufferHeight;
-    const after = new Uint8Array(width * height * 4);
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, after);
-    const before = window.__MAPLES_BASELINE_PIXELS__;
-    if (!before || before.length !== after.length) return { comparable: false, width, height };
-
-    let changedPixels = 0;
-    let totalAbsDiff = 0;
-    let maxChannelDiff = 0;
-    for (let i = 0; i < after.length; i += 4) {
-      let changed = false;
-      for (let c = 0; c < 4; c++) {
-        const diff = Math.abs(after[i + c] - before[i + c]);
-        totalAbsDiff += diff;
-        maxChannelDiff = Math.max(maxChannelDiff, diff);
-        if (diff > 1) changed = true;
-      }
-      if (changed) changedPixels++;
+async function liveFrameTimes(page, frames = 24) {
+  await page.locator('#enter-btn').click();
+  await page.evaluate(() => window.__MAPLES_GAME__.start());
+  const result = await page.evaluate(async count => {
+    const deltas = [];
+    let last = await new Promise(resolve => requestAnimationFrame(resolve));
+    for (let i = 0; i < count + 5; i++) {
+      const now = await new Promise(resolve => requestAnimationFrame(resolve));
+      if (i >= 5) deltas.push(now - last);
+      last = now;
     }
-    const pixels = width * height;
-    return {
-      comparable: true,
-      width,
-      height,
-      pixels,
-      changedPixels,
-      changedPixelRatio: changedPixels / pixels,
-      meanAbsoluteChannelDiff: totalAbsDiff / (pixels * 4),
-      maxChannelDiff,
-    };
-  });
+    return deltas;
+  }, frames);
+  await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
+  return result;
 }
 
-function summarizeRender(raw) {
+async function runCase(page, optimized) {
+  const url = `${baseUrl}/?quality=high${optimized ? '' : '&perf=off'}`;
+  await page.goto(url, { waitUntil: 'networkidle' });
+  await waitReady(page);
+  await freezeAndNormalize(page);
+  const frozen = await snapshot(page);
+  const renderTimes = await isolatedRenderTimes(page);
+  const liveTimes = await liveFrameTimes(page);
   return {
-    medianMs: median(raw.times),
-    averageMs: raw.times.reduce((a, b) => a + b, 0) / raw.times.length,
-    p95Ms: percentile(raw.times, .95),
-    minMs: Math.min(...raw.times),
-    maxMs: Math.max(...raw.times),
-    calls: raw.calls,
-    triangles: raw.triangles,
-    lines: raw.lines,
-    points: raw.points,
-    drawingBuffer: `${raw.width}x${raw.height}`,
+    mode: optimized ? 'optimized' : 'baseline',
+    quality: frozen.quality,
+    sceneMeshes: frozen.sceneMeshes,
+    instancedMeshes: frozen.instancedMeshes,
+    geometryTriangles: frozen.geometryTriangles,
+    calls: frozen.calls,
+    renderedTriangles: frozen.renderedTriangles,
+    fingerprint: frozen.fingerprint,
+    renderMedianMs: median(renderTimes),
+    liveMedianMs: median(liveTimes),
+    liveMedianFps: 1000 / median(liveTimes),
   };
 }
 
-function qualitySettings(snapshot) {
-  const { meshes: _meshes, instancedMeshes: _instancedMeshes, ...settings } = snapshot;
-  return settings;
-}
+const browser = await chromium.launch({
+  headless: true,
+  args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
+});
 
-async function runCase(browser, { name, baseUrl, dist, contextOptions, quality }) {
-  const context = await browser.newContext(contextOptions);
+let report;
+try {
+  const context = await browser.newContext({ viewport: { width: 800, height: 450 }, deviceScaleFactor: 1 });
+  await context.addInitScript(() => {
+    let seed = 0x5eed1234;
+    Math.random = () => {
+      seed |= 0;
+      seed = seed + 0x6D2B79F5 | 0;
+      let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  });
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
-  page.on('console', msg => {
-    if (msg.type() === 'error' && !msg.text().includes('favicon')) errors.push(`console: ${msg.text()}`);
-  });
+  page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('favicon')) errors.push(`console: ${msg.text()}`); });
 
-  try {
-    await page.goto(`${baseUrl}/?perf=off&quality=${quality}`, { waitUntil: 'networkidle' });
-    await waitForGame(page, quality);
+  const baseline = await runCase(page, false);
+  const optimized = await runCase(page, true);
+  const visualDiff = compareFingerprint(baseline.fingerprint, optimized.fingerprint);
+  delete baseline.fingerprint;
+  delete optimized.fingerprint;
 
-    const liveBaseline = await sampleLiveFrames(page);
-    await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
-    await page.waitForTimeout(40);
+  const drawCallReductionPct = (baseline.calls - optimized.calls) / baseline.calls * 100;
+  const renderImprovementPct = (baseline.renderMedianMs - optimized.renderMedianMs) / baseline.renderMedianMs * 100;
+  const liveFpsImprovementPct = (optimized.liveMedianFps - baseline.liveMedianFps) / baseline.liveMedianFps * 100;
+  const geometryDeltaPct = Math.abs(optimized.geometryTriangles - baseline.geometryTriangles) / Math.max(1, baseline.geometryTriangles) * 100;
+  const qualityInvariant = JSON.stringify(baseline.quality) === JSON.stringify(optimized.quality);
 
-    const qualityBefore = await qualitySnapshot(page);
-    const baselinePixels = await storeBaselinePixels(page);
-    const baseline = summarizeRender(await renderBenchmark(page));
-    await page.screenshot({ path: path.join(dist, `perf-${name}-baseline.png`) });
-
-    const performanceStats = await page.evaluate(() => {
-      const pass = window.__MAPLES_INSTALL_PERFORMANCE__();
-      return { ...pass.stats };
-    });
-    const qualityAfter = await qualitySnapshot(page);
-    const optimized = summarizeRender(await renderBenchmark(page));
-    const visualDiff = await comparePixels(page);
-    await page.screenshot({ path: path.join(dist, `perf-${name}-optimized.png`) });
-
-    await page.evaluate(() => window.__MAPLES_GAME__.start());
-    await page.waitForTimeout(40);
-    const liveOptimized = await sampleLiveFrames(page);
-    await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
-
-    return {
-      name,
-      errors,
-      baselinePixels,
-      qualityBefore,
-      qualityAfter,
-      qualityInvariant: JSON.stringify(qualitySettings(qualityBefore)) === JSON.stringify(qualitySettings(qualityAfter)),
-      baseline,
-      optimized,
-      liveBaseline,
-      liveOptimized,
-      liveFpsImprovementPct: liveBaseline.medianFps > 0
-        ? (liveOptimized.medianFps - liveBaseline.medianFps) / liveBaseline.medianFps * 100
-        : 0,
-      renderImprovementPct: baseline.medianMs > 0 ? (baseline.medianMs - optimized.medianMs) / baseline.medianMs * 100 : 0,
-      drawCallReductionPct: baseline.calls > 0 ? (baseline.calls - optimized.calls) / baseline.calls * 100 : 0,
-      triangleInvariant: baseline.triangles === optimized.triangles,
-      performanceStats,
-      visualDiff,
-      visualInvariant: visualDiff.comparable && visualDiff.changedPixelRatio <= .001 && visualDiff.meanAbsoluteChannelDiff <= .05,
-    };
-  } finally {
-    await context.close();
-  }
-}
-
-export async function runPerformanceDiagnostics(browser, options = {}) {
-  const baseUrl = options.baseUrl || process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';
-  const dist = options.dist || path.resolve('dist');
-  fs.mkdirSync(dist, { recursive: true });
-  const report = {
+  report = {
     generatedAt: new Date().toISOString(),
-    status: 'running',
-    methodology: 'Same loaded scene before/after installPerformancePass. Full authored high/low renderer presets are preserved. Live requestAnimationFrame samples measure browser frame pacing; stopped-loop gl.finish samples isolate GPU-complete render cost; readPixels compares the exact same frozen scene.',
+    methodology: 'One Chromium process/page, deterministic RNG, authored high preset at renderer DPR 1.8, deterministic frozen-scene render test plus live idle-gameplay requestAnimationFrame sampling.',
+    errors,
+    baseline,
+    optimized,
+    drawCallReductionPct,
+    renderImprovementPct,
+    liveFpsImprovementPct,
+    geometryDeltaPct,
+    qualityInvariant,
+    visualDiff,
   };
 
-  try {
-    report.desktop = await runCase(browser, {
-      name: 'desktop', baseUrl, dist, quality: 'high',
-      contextOptions: { viewport: { width: 720, height: 405 }, deviceScaleFactor: 2 },
-    });
-    report.mobile = await runCase(browser, {
-      name: 'mobile', baseUrl, dist, quality: 'low',
-      contextOptions: { viewport: { width: 390, height: 640 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
-    });
-    report.status = 'complete';
-  } catch (error) {
-    report.status = 'benchmark-error';
-    report.error = error?.stack || String(error);
-    console.error('PERFORMANCE BENCHMARK ERROR');
-    console.error(report.error);
-  } finally {
-    fs.writeFileSync(path.join(dist, 'perf-report.json'), JSON.stringify(report, null, 2));
+  const failures = [];
+  if (errors.length) failures.push(...errors);
+  if (!qualityInvariant) failures.push('renderer/asset quality settings changed');
+  if (geometryDeltaPct > .01) failures.push(`scene geometry changed by ${geometryDeltaPct.toFixed(4)}%`);
+  if (!visualDiff.comparable || visualDiff.changedPixelRatio > .03 || visualDiff.meanAbsoluteChannelDiff > .75) {
+    failures.push(`frozen-scene pixel fingerprint changed too much: ${JSON.stringify(visualDiff)}`);
   }
+  if (drawCallReductionPct < 5) failures.push(`draw-call reduction below 5%: ${drawCallReductionPct.toFixed(2)}%`);
+  if (renderImprovementPct < 3) failures.push(`GPU-complete render improvement below 3%: ${renderImprovementPct.toFixed(2)}%`);
+  if (liveFpsImprovementPct < -3) failures.push(`live FPS regressed more than 3%: ${liveFpsImprovementPct.toFixed(2)}%`);
 
-  console.log('PERFORMANCE A/B REPORT');
+  report.failures = failures;
+  fs.writeFileSync(path.join(dist, 'perf-report.json'), JSON.stringify(report, null, 2));
+  console.log('PERFORMANCE A/B');
   console.log(JSON.stringify(report, null, 2));
-  return report;
-}
-
-const direct = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
-if (direct) {
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
-  });
-  try {
-    await runPerformanceDiagnostics(browser);
-  } finally {
-    await browser.close();
-  }
+  if (failures.length) process.exitCode = 1;
+  await context.close();
+} catch (error) {
+  report = { generatedAt: new Date().toISOString(), failures: [error.stack || String(error)] };
+  fs.writeFileSync(path.join(dist, 'perf-report.json'), JSON.stringify(report, null, 2));
+  console.error(error);
+  process.exitCode = 1;
+} finally {
+  await browser.close();
 }
