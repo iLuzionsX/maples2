@@ -25,11 +25,16 @@ const CLIPS = {
 };
 
 const LOCOMOTION_KEYS = ['idle', 'walk', 'run', 'turnLeft', 'turnRight'];
+const NON_LOCOMOTION_STATES = new Set(['attack', 'dodge', 'hurt', 'cast', 'dead']);
 const LEFT_CONTACT = .12;
 const RIGHT_CONTACT = .62;
 
 function nowSeconds() {
   return performance.now() * .001;
+}
+
+function locomotionEligible(player, state = player?.state) {
+  return Boolean(player && !player.dead && !NON_LOCOMOTION_STATES.has(state));
 }
 
 function clipByNames(clips, names) {
@@ -260,8 +265,7 @@ function silenceLocomotion(state) {
 }
 
 function updateLocomotion(state, manager, player, dt, turnRate, acceleration) {
-  const allowed = !player.dead && !['attack', 'dodge', 'hurt', 'cast', 'dead'].includes(player.state);
-  if (!allowed) {
+  if (!locomotionEligible(player)) {
     silenceLocomotion(state);
     return { weights: locomotionWeights(0), speed01: 0, moving: false, turnWeight: 0 };
   }
@@ -322,21 +326,22 @@ function detectTransitions(state, manager, player, dt, acceleration, turnRate) {
   state.dodgeRecoveryElapsed += dt;
 
   const speed = player.speed || 0;
-  if (state.lastSpeed < .32 && speed > .58 && acceleration > 2.2) {
+  const transitionEligible = locomotionEligible(player) && locomotionEligible(player, state.lastPlayerState);
+  if (transitionEligible && state.lastSpeed < .32 && speed > .58 && acceleration > 2.2) {
     state.startElapsed = 0;
     manager.events.emit('locomotion:start', { speed, acceleration });
   }
-  if (state.lastSpeed > 1.15 && speed < .82 && acceleration < -2.2) {
+  if (transitionEligible && state.lastSpeed > 1.15 && speed < .82 && acceleration < -2.2) {
     state.stopElapsed = 0;
     manager.events.emit('locomotion:stop', { speed, acceleration });
   }
-  if (speed > 1.35 && Math.abs(turnRate) > 3.9 && state.turnElapsed > .13) {
+  if (transitionEligible && speed > 1.35 && Math.abs(turnRate) > 3.9 && state.turnElapsed > .13) {
     state.turnElapsed = 0;
     state.turnDirection = Math.sign(turnRate) || 1;
     manager.events.emit('locomotion:direction-change', { direction: state.turnDirection, turnRate, speed });
   }
 
-  if (state.lastPlayerState === 'dodge' && player.state !== 'dodge') {
+  if (state.lastPlayerState === 'dodge' && player.state === 'idle') {
     state.dodgeRecoveryElapsed = 0;
     manager.events.emit('dodge:recover', { position: player.position.clone() });
   }
@@ -356,6 +361,7 @@ function detectTransitions(state, manager, player, dt, acceleration, turnRate) {
 }
 
 function applyLocomotionPoseLayer(state, player, acceleration, turnRate) {
+  if (!locomotionEligible(player)) return;
   const bones = state.bones;
   const start = pulseAmount(state.startElapsed, .25);
   const stop = pulseAmount(state.stopElapsed, .28);
@@ -523,7 +529,15 @@ function applyWorldDeltaToNode(node, worldDelta, amount = 1) {
 }
 
 function updateFootIK(state, manager, game, player, dt) {
-  if (!manager.footIKReady || player.state === 'dodge' || player.state === 'dead') return;
+  if (!manager.footIKReady) return;
+  if (player.state === 'dodge' || player.state === 'dead') {
+    for (const footState of [state.foot.left, state.foot.right]) {
+      footState.lock = null;
+      footState.hit = null;
+    }
+    manager.footIKActive = false;
+    return;
+  }
   state.groundRefreshElapsed += dt;
   state.footProbeElapsed += dt;
   if (state.groundRefreshElapsed > 1.0) {
@@ -622,10 +636,12 @@ function updateDirector(game, manager, dt) {
 
   detectTransitions(state, manager, player, dt, acceleration, turnRate);
   const locomotion = updateLocomotion(state, manager, player, dt, turnRate, acceleration);
+  // Mixer-based combo carry must be sampled before procedural skeletal overlays,
+  // otherwise its zero-delta mixer evaluation erases the new strike pose.
+  updateComboCarry(state, manager, player, dt);
   applyLocomotionPoseLayer(state, player, acceleration, turnRate);
   applyAttackPoseLayer(state, manager, player);
   applyHitPoseLayer(state, manager, player);
-  updateComboCarry(state, manager, player, dt);
   updateDeathPose(state, manager, player);
   updateSecondaryMotion(state, player, dt, locomotion.speed01 || clamp01(speed / 5.25), turnRate, acceleration);
   state.model.updateMatrixWorld(true);
@@ -638,6 +654,8 @@ function updateDirector(game, manager, dt) {
   manager.acceleration = acceleration;
   manager.turnRate = turnRate;
   manager.rootProceduralSuppressed = true;
+  manager.actionPoseIsolation = true;
+  manager.comboCarryOrdered = true;
 }
 
 function installGameplayEventHooks(game, manager) {
@@ -734,6 +752,8 @@ export function installRowanAnimationDirector(game) {
     deathPoseHeld: false,
     weaponTrailEventActive: false,
     lastImpactCount: 0,
+    actionPoseIsolation: false,
+    comboCarryOrdered: false,
   };
   manager.events = new AnimationEventBus(manager);
   game.rowanAnimationDirector = manager;
