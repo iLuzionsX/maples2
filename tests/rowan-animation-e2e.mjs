@@ -27,9 +27,6 @@ await page.waitForFunction(() => {
 await page.locator('#enter-btn').click();
 await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__?.rowanAnimationDirector?.ready), null, { timeout: READY_TIMEOUT });
 
-// Keep this a browser integration test, but advance gameplay deterministically.
-// Netlify's SwiftShader renderer can be extremely slow in wall-clock time; the
-// animation system itself is simulation-time driven and wraps player.update().
 await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
   g._updateEnemies = () => {};
@@ -94,11 +91,10 @@ const locomotion = await page.evaluate(() => {
     rootQuaternionError: g.player.assetVisual.quaternion.angleTo(d.state.restQuaternion),
   };
 
-  // Force a genuine sharp gameplay direction change while still locomoting.
   step(35, { x: 1, y: 0 });
   const directionChanges = d.eventCounts['locomotion:direction-change'] || 0;
-
   step(90, { x: 0, y: 0 });
+
   return {
     runSnapshot,
     finalSpeed: g.player.speed,
@@ -151,7 +147,6 @@ const combat = await page.evaluate(() => {
   step(40, { x: 0, y: 0 }, true);
   const attackEvents = { ...d.eventCounts };
 
-  // Directional hit reaction.
   g.player.state = 'idle';
   g.player.stateTime = 0;
   g.player.velocity.set(0, 0, 0);
@@ -165,22 +160,23 @@ const combat = await page.evaluate(() => {
   const hit = d.hitResponse ? { ...d.hitResponse } : null;
   step(30);
 
-  // Dodge from rest must not masquerade as a locomotion start, and planted
-  // contacts from takeoff must be cleared before recovery.
+  // Capture foot contacts exactly at the dodge→idle boundary. Later recovery
+  // frames are allowed to establish a new legitimate planted contact.
   g.player.state = 'idle';
   g.player.stateTime = 0;
   g.player.velocity.set(0, 0, 0);
   g.player.speed = 0;
   g.player.invuln = 0;
   const startsBeforeDodge = d.eventCounts['locomotion:start'] || 0;
-  const dodgeDir = g.player.velocity.clone().set(1, 0, 0);
-  g.player.beginDodge(dodgeDir);
-  step(40);
+  g.player.beginDodge(g.player.velocity.clone().set(1, 0, 0));
+  let dodgeFrames = 0;
+  while (g.player.state === 'dodge' && dodgeFrames++ < 60) g.player.update(dt, { x: 0, y: 0 }, g.cameraYaw);
+  const boundaryFootLocks = [d.state?.foot?.left?.lock, d.state?.foot?.right?.lock].filter(Boolean).length;
   const startsAfterDodge = d.eventCounts['locomotion:start'] || 0;
-  const footLocksAfterDodge = [d.state?.foot?.left?.lock, d.state?.foot?.right?.lock].filter(Boolean).length;
   const dodgeRecoveries = d.eventCounts['dodge:recover'] || 0;
+  step(20);
 
-  // Lethal hit and authored final pose hold.
+  // Lethal hit and actual authored final-pose sampling.
   g.player.state = 'idle';
   g.player.stateTime = 0;
   g.player.velocity.set(0, 0, 0);
@@ -189,16 +185,29 @@ const combat = await page.evaluate(() => {
   g.player.hp = 1;
   g.player.takeDamage(2, { x: g.player.position.x, y: g.player.position.y, z: g.player.position.z + 1 });
   step(90);
+  const deathEntry = d.state?.actions?.deathPose;
+  const deathWeight = deathEntry?.action?.getEffectiveWeight?.() ?? 0;
+  const deathTime = deathEntry?.action?.time ?? -1;
+  const deathExpectedTime = deathEntry?.clip?.duration ? deathEntry.clip.duration * .95 : -1;
+  const deathHips = d.state?.bones?.hips?.quaternion?.clone?.() || null;
+  step(20);
+  const deathPoseDrift = deathHips && d.state?.bones?.hips ? deathHips.angleTo(d.state.bones.hips.quaternion) : Infinity;
+  const deathWeightAfterHold = deathEntry?.action?.getEffectiveWeight?.() ?? 0;
 
   return {
     attackEvents,
     hit,
     startsBeforeDodge,
     startsAfterDodge,
-    footLocksAfterDodge,
+    boundaryFootLocks,
     dodgeRecoveries,
     dead: g.player.dead,
     deathPoseHeld: d.deathPoseHeld,
+    deathWeight,
+    deathWeightAfterHold,
+    deathTime,
+    deathExpectedTime,
+    deathPoseDrift,
     weaponTrailEventActive: d.weaponTrailEventActive,
     rootProceduralSuppressed: d.rootProceduralSuppressed,
     locomotionBlendActive: d.locomotionBlendActive,
@@ -213,9 +222,12 @@ if ((combat.attackEvents['weapon-trail:end'] || 0) < 1) errors.push('Weapon trai
 if ((combat.attackEvents['sword:impact'] || 0) < 1) errors.push('Sword impact event did not follow a real melee hit');
 if (!combat.hit || Math.abs(combat.hit.side) < .7) errors.push(`Directional hit reaction was not classified as a side hit: ${JSON.stringify(combat.hit)}`);
 if (combat.startsAfterDodge !== combat.startsBeforeDodge) errors.push('Dodge incorrectly emitted a locomotion:start event');
-if (combat.footLocksAfterDodge !== 0) errors.push('Dodge recovery retained stale planted-foot locks');
+if (combat.boundaryFootLocks !== 0) errors.push('Dodge retained a stale planted-foot lock at recovery boundary');
 if (combat.dodgeRecoveries < 1) errors.push('Dodge recovery animation event did not fire');
-if (!combat.dead || !combat.deathPoseHeld) errors.push('Rowan death did not settle into the authored final pose');
+if (!combat.dead || !combat.deathPoseHeld) errors.push('Rowan death did not enter the authored final-pose state');
+if (combat.deathWeight < .95 || combat.deathWeightAfterHold < .95) errors.push(`Authored death-pose action did not hold full weight: ${combat.deathWeight}/${combat.deathWeightAfterHold}`);
+if (combat.deathExpectedTime <= 0 || Math.abs(combat.deathTime - combat.deathExpectedTime) > .01) errors.push(`Authored death pose sampled wrong time: ${combat.deathTime} vs ${combat.deathExpectedTime}`);
+if (combat.deathPoseDrift > .01) errors.push(`Authored death skeleton drifted after hold: ${combat.deathPoseDrift}`);
 if (combat.weaponTrailEventActive) errors.push('Weapon trail event remained active after combat finished');
 if (!combat.rootProceduralSuppressed || !combat.locomotionBlendActive) errors.push('Rowan authored director did not remain active through gameplay states');
 
