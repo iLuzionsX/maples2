@@ -16,12 +16,55 @@ function clearFootContacts(manager) {
   manager.footIKActive = false;
 }
 
-function clearNonLocomotionPulses(manager) {
+function finishPulse(manager, type) {
   const state = manager.state;
   if (!state) return;
-  state.startElapsed = Math.max(state.startElapsed, TRANSITION_DURATIONS.start);
-  state.stopElapsed = Math.max(state.stopElapsed, TRANSITION_DURATIONS.stop);
-  state.turnElapsed = Math.max(state.turnElapsed, TRANSITION_DURATIONS.turn);
+  if (type === 'locomotion:start') state.startElapsed = TRANSITION_DURATIONS.start;
+  else if (type === 'locomotion:stop') state.stopElapsed = TRANSITION_DURATIONS.stop;
+  else if (type === 'locomotion:direction-change') state.turnElapsed = TRANSITION_DURATIONS.turn;
+  else if (type === 'dodge:recover') state.dodgeRecoveryElapsed = TRANSITION_DURATIONS.dodgeRecovery;
+}
+
+function clearNonLocomotionPulses(manager) {
+  finishPulse(manager, 'locomotion:start');
+  finishPulse(manager, 'locomotion:stop');
+  finishPulse(manager, 'locomotion:direction-change');
+}
+
+function authoredHitClip(manager, player) {
+  if (player.state !== 'hurt' || !manager.hitResponse) return null;
+  const animator = manager.state?.animator;
+  if (!animator?.mixer || !animator.clips?.length) return null;
+
+  const hitA = animator.clips.find(clip => clip.name === 'Hit_A');
+  const hitB = animator.clips.find(clip => clip.name === 'Hit_B');
+  const response = manager.hitResponse;
+  // Use the authored alternate for impacts from Rowan's right/back side.
+  return response.side < -.05 || response.front < -.55 ? (hitB || hitA) : (hitA || hitB);
+}
+
+function resampleAuthoredActionPose(manager, player) {
+  const state = manager.state;
+  const animator = state?.animator;
+  if (!state || !animator?.mixer || !NON_LOCOMOTION_STATES.has(player.state)) return;
+
+  // The director runs after the normal RigAnimator. Sampling the mixer again here
+  // deliberately removes any locomotion-only additive lean/turn written during
+  // an action frame, leaving the imported authored action as the final body pose.
+  if (player.state === 'hurt') {
+    const clip = authoredHitClip(manager, player);
+    if (clip) {
+      const action = animator.mixer.clipAction(clip);
+      const progress = Math.max(0, Math.min(1, player.stateTime / Math.max(.01, player.stateDuration || .28)));
+      if (animator.action && animator.action !== action) animator.action.setEffectiveWeight(0);
+      action.enabled = true;
+      action.paused = true;
+      action.setEffectiveWeight(1);
+      action.time = clip.duration * Math.min(.98, progress);
+      manager.directionalHitClip = clip.name;
+    }
+  }
+  animator.mixer.update(0);
 }
 
 export function installFrameInvariantRowanTransitions(game, manager) {
@@ -37,10 +80,14 @@ export function installFrameInvariantRowanTransitions(game, manager) {
       ['locomotion:start', 'locomotion:stop', 'locomotion:direction-change'].includes(type) &&
       (!currentLocomotionEligible || !startedInLocomotion)
     ) {
+      // detectTransitions resets its pulse immediately before emitting. Restore
+      // the completed value here so the suppressed event cannot still alter pose.
+      finishPulse(manager, type);
       return { type, suppressed: true, ...detail };
     }
 
     if (type === 'dodge:recover' && game.player.state !== 'idle') {
+      finishPulse(manager, type);
       return { type, suppressed: true, ...detail };
     }
 
@@ -56,7 +103,6 @@ export function installFrameInvariantRowanTransitions(game, manager) {
     const startCount = manager.eventCounts['locomotion:start'] || 0;
     const stopCount = manager.eventCounts['locomotion:stop'] || 0;
 
-    // A planted contact from the takeoff pose must never survive into a dodge frame.
     if (previousState === 'dodge') clearFootContacts(manager);
 
     updateContext = { previousState, startedInLocomotion };
@@ -78,8 +124,9 @@ export function installFrameInvariantRowanTransitions(game, manager) {
     if (state && !eligible) {
       clearNonLocomotionPulses(manager);
       if (previousState === 'dodge' && currentState !== 'idle') {
-        state.dodgeRecoveryElapsed = Math.max(state.dodgeRecoveryElapsed, TRANSITION_DURATIONS.dodgeRecovery);
+        finishPulse(manager, 'dodge:recover');
       }
+      resampleAuthoredActionPose(manager, game.player);
       return result;
     }
 
@@ -110,5 +157,6 @@ export function installFrameInvariantRowanTransitions(game, manager) {
 
   manager.frameInvariantTransitions = true;
   manager.transitionStateIsolation = true;
+  manager.authoredActionPoseFinal = true;
   return manager;
 }
