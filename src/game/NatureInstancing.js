@@ -61,6 +61,9 @@ export async function installNatureInstancing(game) {
     sourceMeshesHidden: 0,
     estimatedDrawCallsSaved: 0,
     skippedSlots: 0,
+    sync() {
+      for (const record of result.batches) updateBatchMatrices(record);
+    },
   };
 
   if (!manager?.ready || !manager.instances?.length) {
@@ -69,7 +72,7 @@ export async function installNatureInstancing(game) {
   }
 
   // ShowcaseQualityGate installs its final wind wrapper on the frame after nature becomes ready.
-  // Wait one frame so our matrix upload runs after every authored wind layer has updated the roots.
+  // Wait one frame so all authored wind layers are present before the source meshes are batched.
   await new Promise(resolve => requestAnimationFrame(resolve));
 
   const decor = game.world.decor;
@@ -131,10 +134,13 @@ export async function installNatureInstancing(game) {
   }
 
   if (result.batches.length) {
-    const baseWorldUpdate = game.world.update.bind(game.world);
-    game.world.update = dt => {
-      baseWorldUpdate(dt);
-      for (const record of result.batches) updateBatchMatrices(record);
+    // Sync immediately before rendering. This preserves every authored wind/root transform,
+    // avoids coupling to the chain of world.update wrappers, and also makes frozen visual
+    // comparisons exact after a test or cinematic directly changes a source transform.
+    const previousSceneBeforeRender = game.scene.onBeforeRender;
+    game.scene.onBeforeRender = function (...args) {
+      previousSceneBeforeRender?.apply(this, args);
+      result.sync();
     };
   }
 
