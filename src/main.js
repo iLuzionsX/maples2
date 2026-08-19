@@ -11,6 +11,7 @@ import { installCinematicPolish } from './game/CinematicPolish.js';
 import { installRowanStyle } from './game/RowanStyle.js';
 import { installShowcasePass } from './game/ShowcasePass.js';
 import { installAnimationPolish } from './game/AnimationPolish.js';
+import { installRowanAnimationDirector } from './game/RowanAnimationDirector.js';
 import { installShowcaseQualityGate } from './game/ShowcaseQualityGate.js';
 
 const canvas = document.querySelector('#game');
@@ -26,6 +27,7 @@ installRowanStyle(game);
 installCinematicPolish(game);
 installShowcasePass(game);
 installAnimationPolish(game);
+installRowanAnimationDirector(game);
 installShowcaseQualityGate(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
