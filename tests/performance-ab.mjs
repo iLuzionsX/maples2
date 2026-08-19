@@ -1,10 +1,7 @@
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 import path from 'node:path';
-
-const baseUrl = process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';
-const dist = path.resolve('dist');
-fs.mkdirSync(dist, { recursive: true });
+import { pathToFileURL } from 'node:url';
 
 function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
@@ -12,7 +9,12 @@ function median(values) {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-async function waitForGame(page, expectHigh) {
+function percentile(values, p) {
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))];
+}
+
+async function waitForGame(page, quality) {
   await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__), null, { timeout: 30000 });
   await page.waitForFunction(() => {
     const g = window.__MAPLES_GAME__;
@@ -20,12 +22,31 @@ async function waitForGame(page, expectHigh) {
       g.environmentAssetManager?.ready && g.natureAssetManager?.ready &&
       g.animationPolishManager?.ready && document.querySelector('#enter-btn')?.dataset.ready === 'true';
   }, null, { timeout: 90000 });
-  if (expectHigh) {
-    await page.waitForFunction(() => window.__MAPLES_GAME__.quality === 'high', null, { timeout: 5000 });
-  }
+  await page.waitForFunction(expected => window.__MAPLES_GAME__.quality === expected, quality, { timeout: 5000 });
   await page.locator('#enter-btn').click();
   await page.waitForTimeout(220);
-  await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
+}
+
+async function sampleLiveFrames(page, frameCount = 30) {
+  return page.evaluate(async count => {
+    const deltas = [];
+    let previous = await new Promise(resolve => requestAnimationFrame(resolve));
+    for (let i = 0; i < count + 5; i++) {
+      const now = await new Promise(resolve => requestAnimationFrame(resolve));
+      if (i >= 5) deltas.push(now - previous);
+      previous = now;
+    }
+    deltas.sort((a, b) => a - b);
+    const medianMs = deltas[Math.floor(deltas.length / 2)] || 0;
+    const p95Ms = deltas[Math.min(deltas.length - 1, Math.ceil(deltas.length * .95) - 1)] || 0;
+    return {
+      samples: deltas.length,
+      medianMs,
+      p95Ms,
+      medianFps: medianMs > 0 ? 1000 / medianMs : 0,
+      p95Fps: p95Ms > 0 ? 1000 / p95Ms : 0,
+    };
+  }, frameCount);
 }
 
 async function qualitySnapshot(page) {
@@ -39,9 +60,7 @@ async function qualitySnapshot(page) {
       if (node.isLight && node.visible) visibleLights++;
       if (node.isMesh) meshes++;
       if (node.isInstancedMesh) instancedMeshes++;
-      if (node.isDirectionalLight && node.castShadow) {
-        shadowMaps.push({ x: node.shadow.mapSize.x, y: node.shadow.mapSize.y });
-      }
+      if (node.isDirectionalLight && node.castShadow) shadowMaps.push({ x: node.shadow.mapSize.x, y: node.shadow.mapSize.y });
     });
     return {
       quality: g.quality,
@@ -69,7 +88,7 @@ async function qualitySnapshot(page) {
   });
 }
 
-async function renderBenchmark(page, iterations = 3) {
+async function renderBenchmark(page, iterations = 2) {
   return page.evaluate(({ iterations }) => {
     const g = window.__MAPLES_GAME__;
     const renderer = g.renderer;
@@ -95,11 +114,7 @@ async function renderBenchmark(page, iterations = 3) {
     }
     renderer.info.autoReset = true;
     renderer.info.reset();
-    return {
-      times, calls, triangles, lines, points,
-      width: gl.drawingBufferWidth,
-      height: gl.drawingBufferHeight,
-    };
+    return { times, calls, triangles, lines, points, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight };
   }, { iterations });
 }
 
@@ -156,10 +171,11 @@ async function comparePixels(page) {
   });
 }
 
-function summarize(raw) {
+function summarizeRender(raw) {
   return {
     medianMs: median(raw.times),
     averageMs: raw.times.reduce((a, b) => a + b, 0) / raw.times.length,
+    p95Ms: percentile(raw.times, .95),
     minMs: Math.min(...raw.times),
     maxMs: Math.max(...raw.times),
     calls: raw.calls,
@@ -175,7 +191,7 @@ function qualitySettings(snapshot) {
   return settings;
 }
 
-async function runCase(browser, name, contextOptions, expectHigh) {
+async function runCase(browser, { name, baseUrl, dist, contextOptions, quality }) {
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
   const errors = [];
@@ -185,13 +201,16 @@ async function runCase(browser, name, contextOptions, expectHigh) {
   });
 
   try {
-    const quality = expectHigh ? 'high' : 'low';
     await page.goto(`${baseUrl}/?perf=off&quality=${quality}`, { waitUntil: 'networkidle' });
-    await waitForGame(page, expectHigh);
+    await waitForGame(page, quality);
+
+    const liveBaseline = await sampleLiveFrames(page);
+    await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
+    await page.waitForTimeout(40);
 
     const qualityBefore = await qualitySnapshot(page);
     const baselinePixels = await storeBaselinePixels(page);
-    const baseline = summarize(await renderBenchmark(page));
+    const baseline = summarizeRender(await renderBenchmark(page));
     await page.screenshot({ path: path.join(dist, `perf-${name}-baseline.png`) });
 
     const performanceStats = await page.evaluate(() => {
@@ -199,9 +218,14 @@ async function runCase(browser, name, contextOptions, expectHigh) {
       return { ...pass.stats };
     });
     const qualityAfter = await qualitySnapshot(page);
-    const optimized = summarize(await renderBenchmark(page));
+    const optimized = summarizeRender(await renderBenchmark(page));
     const visualDiff = await comparePixels(page);
     await page.screenshot({ path: path.join(dist, `perf-${name}-optimized.png`) });
+
+    await page.evaluate(() => window.__MAPLES_GAME__.start());
+    await page.waitForTimeout(40);
+    const liveOptimized = await sampleLiveFrames(page);
+    await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
 
     return {
       name,
@@ -212,53 +236,66 @@ async function runCase(browser, name, contextOptions, expectHigh) {
       qualityInvariant: JSON.stringify(qualitySettings(qualityBefore)) === JSON.stringify(qualitySettings(qualityAfter)),
       baseline,
       optimized,
+      liveBaseline,
+      liveOptimized,
+      liveFpsImprovementPct: liveBaseline.medianFps > 0
+        ? (liveOptimized.medianFps - liveBaseline.medianFps) / liveBaseline.medianFps * 100
+        : 0,
       renderImprovementPct: baseline.medianMs > 0 ? (baseline.medianMs - optimized.medianMs) / baseline.medianMs * 100 : 0,
       drawCallReductionPct: baseline.calls > 0 ? (baseline.calls - optimized.calls) / baseline.calls * 100 : 0,
       triangleInvariant: baseline.triangles === optimized.triangles,
       performanceStats,
       visualDiff,
-      visualInvariant: visualDiff.comparable && visualDiff.changedPixelRatio <= 0.001 && visualDiff.meanAbsoluteChannelDiff <= 0.05,
+      visualInvariant: visualDiff.comparable && visualDiff.changedPixelRatio <= .001 && visualDiff.meanAbsoluteChannelDiff <= .05,
     };
   } finally {
     await context.close();
   }
 }
 
-const report = {
-  generatedAt: new Date().toISOString(),
-  status: 'running',
-  methodology: 'Same loaded scene before/after installPerformancePass; animation loop stopped; three forced GPU-complete renders per phase; SwiftShader on Netlify Chromium. Desktop uses the authored high preset at 1.8 renderer pixel ratio; mobile uses the authored low preset at 1.15. The desktop viewport is 800x450 to bound CI cost without lowering renderer quality settings.',
-};
+export async function runPerformanceDiagnostics(browser, options = {}) {
+  const baseUrl = options.baseUrl || process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';
+  const dist = options.dist || path.resolve('dist');
+  fs.mkdirSync(dist, { recursive: true });
+  const report = {
+    generatedAt: new Date().toISOString(),
+    status: 'running',
+    methodology: 'Same loaded scene before/after installPerformancePass. Full authored high/low renderer presets are preserved. Live requestAnimationFrame samples measure browser frame pacing; stopped-loop gl.finish samples isolate GPU-complete render cost; readPixels compares the exact same frozen scene.',
+  };
 
-let browser;
-try {
-  browser = await chromium.launch({
+  try {
+    report.desktop = await runCase(browser, {
+      name: 'desktop', baseUrl, dist, quality: 'high',
+      contextOptions: { viewport: { width: 720, height: 405 }, deviceScaleFactor: 2 },
+    });
+    report.mobile = await runCase(browser, {
+      name: 'mobile', baseUrl, dist, quality: 'low',
+      contextOptions: { viewport: { width: 390, height: 640 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
+    });
+    report.status = 'complete';
+  } catch (error) {
+    report.status = 'benchmark-error';
+    report.error = error?.stack || String(error);
+    console.error('PERFORMANCE BENCHMARK ERROR');
+    console.error(report.error);
+  } finally {
+    fs.writeFileSync(path.join(dist, 'perf-report.json'), JSON.stringify(report, null, 2));
+  }
+
+  console.log('PERFORMANCE A/B REPORT');
+  console.log(JSON.stringify(report, null, 2));
+  return report;
+}
+
+const direct = process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+if (direct) {
+  const browser = await chromium.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
   });
-
-  report.desktop = await runCase(browser, 'desktop', {
-    viewport: { width: 800, height: 450 },
-    deviceScaleFactor: 2,
-  }, true);
-
-  report.mobile = await runCase(browser, 'mobile', {
-    viewport: { width: 390, height: 640 },
-    deviceScaleFactor: 2,
-    isMobile: true,
-    hasTouch: true,
-  }, false);
-
-  report.status = 'complete';
-} catch (error) {
-  report.status = 'benchmark-error';
-  report.error = error?.stack || String(error);
-  console.error('PERFORMANCE BENCHMARK ERROR');
-  console.error(report.error);
-} finally {
-  if (browser) await browser.close();
-  fs.writeFileSync(path.join(dist, 'perf-report.json'), JSON.stringify(report, null, 2));
+  try {
+    await runPerformanceDiagnostics(browser);
+  } finally {
+    await browser.close();
+  }
 }
-
-console.log('PERFORMANCE A/B REPORT');
-console.log(JSON.stringify(report, null, 2));
