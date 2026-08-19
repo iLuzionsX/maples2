@@ -30,6 +30,21 @@ await page.waitForFunction(() => {
 await page.locator('#enter-btn').click();
 await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__?.rowanAnimationDirector?.ready), null, { timeout: READY_TIMEOUT });
 
+// Isolate Rowan animation validation from unrelated enemy AI while keeping the
+// imported enemies in the scene so melee still goes through the real resolver.
+await page.evaluate(() => {
+  const g = window.__MAPLES_GAME__;
+  g._updateEnemies = () => {};
+  g._updateEncounter = () => {};
+  for (const enemy of g.enemies) {
+    enemy.velocity?.set?.(0, 0, 0);
+    if (!enemy.dead) {
+      enemy.state = 'idle';
+      enemy.stateTime = 0;
+    }
+  }
+});
+
 const boot = await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
   const d = g.rowanAnimationDirector;
