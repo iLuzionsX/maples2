@@ -33,9 +33,9 @@ const preview = spawn(
 
 try {
   await ready();
-  await run('node', ['tests/performance-ab.mjs']);
+  await run('node', ['scripts/performance-observe.mjs']);
   await run('node', ['scripts/perf-threshold.mjs']);
-  console.log('FULL-QUALITY PERFORMANCE A/B PASS');
+  console.log('FULL-QUALITY PERFORMANCE A/B COMPLETE');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
