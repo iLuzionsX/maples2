@@ -32,7 +32,12 @@ installShowcaseQualityGate(game);
 const performanceDisabled = new URLSearchParams(location.search).get('perf') === 'off';
 let performancePass = null;
 window.__MAPLES_INSTALL_PERFORMANCE__ = () => {
-  performancePass ||= installPerformancePass(game);
+  if (!performancePass) {
+    // Performance work must never replace the authored/cinematic camera stack.
+    const preservedCameraUpdate = game._updateCamera;
+    performancePass = installPerformancePass(game);
+    game._updateCamera = preservedCameraUpdate;
+  }
   return performancePass;
 };
 if (!performanceDisabled) window.__MAPLES_INSTALL_PERFORMANCE__();
