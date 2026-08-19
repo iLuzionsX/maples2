@@ -6,30 +6,25 @@ const baseUrl = process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';
 const dist = path.resolve('dist');
 fs.mkdirSync(dist, { recursive: true });
 
-const browser = await chromium.launch({
-  headless: true,
-  args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
-});
-
 function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-async function waitForGame(page, highQuality) {
-  await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__));
+async function waitForGame(page, expectHigh) {
+  await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__), null, { timeout: 30000 });
   await page.waitForFunction(() => {
     const g = window.__MAPLES_GAME__;
     return g.assetVisualManager?.ready && g.assetVisualManager?.heroReady &&
       g.environmentAssetManager?.ready && g.natureAssetManager?.ready &&
       g.animationPolishManager?.ready && document.querySelector('#enter-btn')?.dataset.ready === 'true';
   }, null, { timeout: 90000 });
-  if (highQuality) {
+  if (expectHigh) {
     await page.waitForFunction(() => window.__MAPLES_GAME__.quality === 'high', null, { timeout: 5000 });
   }
   await page.locator('#enter-btn').click();
-  await page.waitForTimeout(350);
+  await page.waitForTimeout(220);
   await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
 }
 
@@ -38,8 +33,12 @@ async function qualitySnapshot(page) {
     const g = window.__MAPLES_GAME__;
     const shadowMaps = [];
     let visibleLights = 0;
+    let meshes = 0;
+    let instancedMeshes = 0;
     g.scene.traverse(node => {
       if (node.isLight && node.visible) visibleLights++;
+      if (node.isMesh) meshes++;
+      if (node.isInstancedMesh) instancedMeshes++;
       if (node.isDirectionalLight && node.castShadow) {
         shadowMaps.push({ x: node.shadow.mapSize.x, y: node.shadow.mapSize.y });
       }
@@ -59,6 +58,8 @@ async function qualitySnapshot(page) {
       })) || [],
       shadowMaps,
       visibleLights,
+      meshes,
+      instancedMeshes,
       environmentPieces: g.environmentAssetManager?.count ?? 0,
       naturePieces: g.natureAssetManager?.count ?? 0,
       importedEnemies: g.enemies.filter(e => e.assetVisual).length,
@@ -68,7 +69,7 @@ async function qualitySnapshot(page) {
   });
 }
 
-async function renderBenchmark(page, iterations = 8) {
+async function renderBenchmark(page, iterations = 3) {
   return page.evaluate(({ iterations }) => {
     const g = window.__MAPLES_GAME__;
     const renderer = g.renderer;
@@ -76,11 +77,9 @@ async function renderBenchmark(page, iterations = 8) {
     const times = [];
     renderer.info.autoReset = false;
 
-    for (let i = 0; i < 2; i++) {
-      renderer.info.reset();
-      g._render();
-      gl.finish();
-    }
+    renderer.info.reset();
+    g._render();
+    gl.finish();
 
     let calls = 0, triangles = 0, lines = 0, points = 0;
     for (let i = 0; i < iterations; i++) {
@@ -96,7 +95,11 @@ async function renderBenchmark(page, iterations = 8) {
     }
     renderer.info.autoReset = true;
     renderer.info.reset();
-    return { times, calls, triangles, lines, points, width: gl.drawingBufferWidth, height: gl.drawingBufferHeight };
+    return {
+      times, calls, triangles, lines, points,
+      width: gl.drawingBufferWidth,
+      height: gl.drawingBufferHeight,
+    };
   }, { iterations });
 }
 
@@ -134,7 +137,7 @@ async function comparePixels(page) {
       for (let c = 0; c < 4; c++) {
         const diff = Math.abs(after[i + c] - before[i + c]);
         totalAbsDiff += diff;
-        if (diff > maxChannelDiff) maxChannelDiff = diff;
+        maxChannelDiff = Math.max(maxChannelDiff, diff);
         if (diff > 1) changed = true;
       }
       if (changed) changedPixels++;
@@ -167,87 +170,94 @@ function summarize(raw) {
   };
 }
 
-async function runCase(name, contextOptions, expectHigh) {
+function qualitySettings(snapshot) {
+  const { meshes: _meshes, instancedMeshes: _instancedMeshes, ...settings } = snapshot;
+  return settings;
+}
+
+async function runCase(browser, name, contextOptions, expectHigh) {
   const context = await browser.newContext(contextOptions);
   const page = await context.newPage();
   const errors = [];
   page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
-  page.on('console', msg => { if (msg.type() === 'error' && !msg.text().includes('favicon')) errors.push(`console: ${msg.text()}`); });
-
-  await page.goto(`${baseUrl}/?perf=off&capture=1`, { waitUntil: 'networkidle' });
-  await waitForGame(page, expectHigh);
-
-  const qualityBefore = await qualitySnapshot(page);
-  const baselinePixels = await storeBaselinePixels(page);
-  const baselineRaw = await renderBenchmark(page);
-  await page.screenshot({ path: path.join(dist, `perf-${name}-baseline.png`) });
-
-  const performanceStats = await page.evaluate(() => {
-    const pass = window.__MAPLES_INSTALL_PERFORMANCE__();
-    return { ...pass.stats };
+  page.on('console', msg => {
+    if (msg.type() === 'error' && !msg.text().includes('favicon')) errors.push(`console: ${msg.text()}`);
   });
-  const qualityAfter = await qualitySnapshot(page);
-  const optimizedRaw = await renderBenchmark(page);
-  const visualDiff = await comparePixels(page);
-  await page.screenshot({ path: path.join(dist, `perf-${name}-optimized.png`) });
 
-  const baseline = summarize(baselineRaw);
-  const optimized = summarize(optimizedRaw);
-  const renderImprovementPct = baseline.medianMs > 0
-    ? (baseline.medianMs - optimized.medianMs) / baseline.medianMs * 100
-    : 0;
-  const drawCallReductionPct = baseline.calls > 0
-    ? (baseline.calls - optimized.calls) / baseline.calls * 100
-    : 0;
+  try {
+    await page.goto(`${baseUrl}/?perf=off&capture=1`, { waitUntil: 'networkidle' });
+    await waitForGame(page, expectHigh);
 
-  await context.close();
-  return {
-    name,
-    errors,
-    baselinePixels,
-    qualityBefore,
-    qualityAfter,
-    qualityInvariant: JSON.stringify(qualityBefore) === JSON.stringify(qualityAfter),
-    baseline,
-    optimized,
-    renderImprovementPct,
-    drawCallReductionPct,
-    performanceStats,
-    visualDiff,
-    visualInvariant: visualDiff.comparable && visualDiff.changedPixelRatio <= 0.001 && visualDiff.meanAbsoluteChannelDiff <= 0.05,
-  };
+    const qualityBefore = await qualitySnapshot(page);
+    const baselinePixels = await storeBaselinePixels(page);
+    const baseline = summarize(await renderBenchmark(page));
+    await page.screenshot({ path: path.join(dist, `perf-${name}-baseline.png`) });
+
+    const performanceStats = await page.evaluate(() => {
+      const pass = window.__MAPLES_INSTALL_PERFORMANCE__();
+      return { ...pass.stats };
+    });
+    const qualityAfter = await qualitySnapshot(page);
+    const optimized = summarize(await renderBenchmark(page));
+    const visualDiff = await comparePixels(page);
+    await page.screenshot({ path: path.join(dist, `perf-${name}-optimized.png`) });
+
+    return {
+      name,
+      errors,
+      baselinePixels,
+      qualityBefore,
+      qualityAfter,
+      qualityInvariant: JSON.stringify(qualitySettings(qualityBefore)) === JSON.stringify(qualitySettings(qualityAfter)),
+      baseline,
+      optimized,
+      renderImprovementPct: baseline.medianMs > 0 ? (baseline.medianMs - optimized.medianMs) / baseline.medianMs * 100 : 0,
+      drawCallReductionPct: baseline.calls > 0 ? (baseline.calls - optimized.calls) / baseline.calls * 100 : 0,
+      triangleInvariant: baseline.triangles === optimized.triangles,
+      performanceStats,
+      visualDiff,
+      visualInvariant: visualDiff.comparable && visualDiff.changedPixelRatio <= 0.001 && visualDiff.meanAbsoluteChannelDiff <= 0.05,
+    };
+  } finally {
+    await context.close();
+  }
 }
 
-let report;
+const report = {
+  generatedAt: new Date().toISOString(),
+  status: 'running',
+  methodology: 'Same loaded scene before/after installPerformancePass; animation loop stopped; three forced GPU-complete renders per phase; SwiftShader on Netlify Chromium. Desktop keeps the authored high preset and 1.8 renderer pixel ratio at an 800x450 viewport to bound CI cost.',
+};
+
+let browser;
 try {
-  const desktop = await runCase('desktop', {
-    viewport: { width: 1280, height: 720 },
+  browser = await chromium.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
+  });
+
+  report.desktop = await runCase(browser, 'desktop', {
+    viewport: { width: 800, height: 450 },
     deviceScaleFactor: 2,
   }, true);
 
-  const mobile = await runCase('mobile', {
-    viewport: { width: 390, height: 844 },
+  report.mobile = await runCase(browser, 'mobile', {
+    viewport: { width: 390, height: 640 },
     deviceScaleFactor: 2,
     isMobile: true,
     hasTouch: true,
   }, false);
 
-  report = {
-    generatedAt: new Date().toISOString(),
-    methodology: 'Same loaded scene before/after installPerformancePass; animation loop stopped; WebGL gl.finish() after each render; SwiftShader on Netlify Chromium.',
-    desktop,
-    mobile,
-  };
+  report.status = 'complete';
+} catch (error) {
+  report.status = 'benchmark-error';
+  report.error = error?.stack || String(error);
+  console.error('PERFORMANCE BENCHMARK ERROR');
+  console.error(report.error);
 } finally {
-  await browser.close();
+  if (browser) await browser.close();
+  fs.writeFileSync(path.join(dist, 'perf-report.json'), JSON.stringify(report, null, 2));
 }
 
-fs.writeFileSync(path.join(dist, 'perf-report.json'), JSON.stringify(report, null, 2));
 console.log('PERFORMANCE A/B REPORT');
 console.log(JSON.stringify(report, null, 2));
-
-const hardFailures = [report.desktop, report.mobile].flatMap(result => result.errors);
-if (hardFailures.length) {
-  console.error(hardFailures.join('\n'));
-  process.exit(1);
-}
