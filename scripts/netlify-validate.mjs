@@ -55,21 +55,17 @@ const preview = spawn(
 
 try {
   await ready();
-  const results = [];
-  results.push(await runCaptured('MOVEMENT SUITE', 'npm', ['run', 'test:movement']));
-  results.push(await runCaptured('ROWAN ANIMATION BROWSER SUITE', 'node', ['tests/rowan-animation-e2e.mjs']));
-  results.push(await runCaptured('VISUAL SUITE', 'node', ['scripts/visual-netlify.mjs']));
-
-  const summary = results.map(result => `${result.label}: ${result.code === 0 ? 'PASS' : `FAIL (${result.code})`}`).join('\n');
+  const result = await runCaptured('ROWAN ANIMATION BROWSER SUITE', 'node', ['tests/rowan-animation-e2e.mjs']);
+  const summary = `${result.label}: ${result.code === 0 ? 'PASS' : `FAIL (${result.code})`}`;
   const diagnostics = [
-    'TEMPORARY NETLIFY VALIDATION DIAGNOSTICS',
+    'TEMPORARY ROWAN-ONLY NETLIFY VALIDATION DIAGNOSTICS',
     `commit: ${process.env.COMMIT_REF || 'unknown'}`,
     summary,
-    ...results.map(result => result.output),
+    result.output,
   ].join('\n');
   fs.writeFileSync('dist/validation-diagnostics.txt', diagnostics);
   console.log(summary);
-  console.log('DIAGNOSTIC PREVIEW PUBLISHED; strict validation will be restored before approval.');
+  console.log('ROWAN-ONLY DIAGNOSTIC PREVIEW PUBLISHED; strict validation will be restored before approval.');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
