@@ -2,6 +2,8 @@ import * as THREE from 'three';
 
 const EMPTY = Object.freeze([]);
 const _inverseDecor = new THREE.Matrix4();
+const _batchProjection = new THREE.Matrix4();
+const _batchFrustum = new THREE.Frustum();
 
 function textureId(texture) {
   return texture?.uuid || '';
@@ -12,7 +14,7 @@ function colorId(color) {
 }
 
 function materialSignature(material) {
-  if (!material || Array.isArray(material)) return null;
+  if (!material || Array.isArray(material) || material.visible === false) return null;
   if (material.transparent || material.opacity < .999 || material.blending !== THREE.NormalBlending) return null;
   if (!material.isMeshStandardMaterial && !material.isMeshBasicMaterial && !material.isMeshLambertMaterial && !material.isMeshPhongMaterial) return null;
 
@@ -62,7 +64,7 @@ function isDynamicMesh(mesh, game, dynamicRoots) {
 
   const decor = game.world.decor;
   for (let node = mesh; node && node !== decor; node = node.parent) {
-    if (dynamicRoots.has(node) || node.userData?.assetNature) return true;
+    if (!node.visible || dynamicRoots.has(node) || node.userData?.assetNature) return true;
   }
   return false;
 }
@@ -83,7 +85,7 @@ function buildDynamicRoots(game) {
   return roots;
 }
 
-function batchStaticDecor(game, stats) {
+function batchStaticDecor(game, stats, records) {
   const decor = game.world.decor;
   const dynamicRoots = buildDynamicRoots(game);
   const groups = new Map();
@@ -109,7 +111,7 @@ function batchStaticDecor(game, stats) {
 
     const matrix = new THREE.Matrix4().multiplyMatrices(_inverseDecor, mesh.matrixWorld);
     if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push({ mesh, matrix });
+    groups.get(key).push({ mesh, matrix, alwaysVisible: mesh.frustumCulled === false });
   });
 
   let batchedMeshes = 0;
@@ -125,16 +127,26 @@ function batchStaticDecor(game, stats) {
     batch.receiveShadow = first.receiveShadow;
     batch.renderOrder = first.renderOrder;
     batch.layers.mask = first.layers.mask;
-    batch.frustumCulled = true;
-    batch.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+    // Exact per-source frustum culling is applied immediately before render.
+    batch.frustumCulled = false;
+    batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
     for (let i = 0; i < entries.length; i++) batch.setMatrixAt(i, entries[i].matrix);
     batch.instanceMatrix.needsUpdate = true;
-    batch.computeBoundingBox();
-    batch.computeBoundingSphere();
     decor.add(batch);
 
-    for (const { mesh } of entries) mesh.parent?.remove(mesh);
+    // Keep source meshes in the hierarchy as zero-render-cost culling proxies. Their
+    // world matrices and bounding volumes let the batch preserve Three.js' original
+    // per-mesh visibility exactly, instead of rendering off-screen instances.
+    for (const { mesh } of entries) mesh.visible = false;
+
+    records.push({
+      batch,
+      entries,
+      visible: new Int32Array(entries.length),
+      scratchVisible: new Int32Array(entries.length),
+      visibleCount: -1,
+    });
 
     batchedMeshes += entries.length;
     batches++;
@@ -146,6 +158,54 @@ function batchStaticDecor(game, stats) {
   stats.instancedBatches += batches;
   stats.estimatedDrawCallsSaved += savedDrawCalls;
   return { batchedMeshes, batches, savedDrawCalls };
+}
+
+function syncStaticBatchVisibility(game, records, stats) {
+  if (!records.length) return;
+
+  _batchProjection.multiplyMatrices(game.camera.projectionMatrix, game.camera.matrixWorldInverse);
+  _batchFrustum.setFromProjectionMatrix(_batchProjection);
+
+  let visibleInstances = 0;
+  let culledInstances = 0;
+
+  for (const record of records) {
+    const { batch, entries } = record;
+    const next = record.scratchVisible;
+    let nextCount = 0;
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry.alwaysVisible || _batchFrustum.intersectsObject(entry.mesh)) next[nextCount++] = i;
+    }
+
+    let changed = nextCount !== record.visibleCount;
+    if (!changed) {
+      for (let i = 0; i < nextCount; i++) {
+        if (next[i] !== record.visible[i]) { changed = true; break; }
+      }
+    }
+
+    if (changed) {
+      for (let i = 0; i < nextCount; i++) batch.setMatrixAt(i, entries[next[i]].matrix);
+      batch.count = nextCount;
+      batch.visible = nextCount > 0;
+      if (nextCount > 0) batch.instanceMatrix.needsUpdate = true;
+
+      const previous = record.visible;
+      record.visible = record.scratchVisible;
+      record.scratchVisible = previous;
+      record.visibleCount = nextCount;
+      stats.staticCullUpdates++;
+    }
+
+    visibleInstances += nextCount;
+    culledInstances += entries.length - nextCount;
+  }
+
+  stats.staticCullFrames++;
+  stats.staticVisibleInstances = visibleInstances;
+  stats.staticCulledInstances = culledInstances;
 }
 
 function installHudCache(game, stats) {
@@ -240,16 +300,28 @@ export function installPerformancePass(game) {
     estimatedDrawCallsSaved: 0,
     hudFrames: 0,
     showcaseFrames: 0,
+    staticCullFrames: 0,
+    staticCullUpdates: 0,
+    staticVisibleInstances: 0,
+    staticCulledInstances: 0,
   };
+  const staticBatches = [];
 
   installHudCache(game, stats);
   installScratchMath(game);
   optimizeShowcaseUpdate(game, stats);
 
+  const previousSceneBeforeRender = game.scene.onBeforeRender;
+  game.scene.onBeforeRender = function (...args) {
+    previousSceneBeforeRender?.apply(this, args);
+    syncStaticBatchVisibility(game, staticBatches, stats);
+  };
+
   const pass = {
     stats,
+    staticBatches,
     rebatch() {
-      const result = batchStaticDecor(game, stats);
+      const result = batchStaticDecor(game, stats, staticBatches);
       console.info('[Maples performance]', result, stats);
       return result;
     },
