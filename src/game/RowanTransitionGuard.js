@@ -19,10 +19,32 @@ function clearFootContacts(manager) {
 function clearInterruptedComboCarry(manager) {
   const carry = manager.state?.comboCarry;
   if (!carry) return;
+  carry.action?.stopFading?.();
+  carry.current?.stopFading?.();
   carry.action?.setEffectiveWeight?.(0);
   if (carry.current) carry.current.setEffectiveWeight(1);
   manager.state.comboCarry = null;
   manager.comboCarryInterrupted = true;
+}
+
+function installAnimatorFadeGuard(manager) {
+  const animator = manager.state?.animator;
+  if (!animator || animator.__rowanComboFadeGuard) return;
+  animator.__rowanComboFadeGuard = true;
+  const rawPlay = animator.play.bind(animator);
+  animator.play = (key, options) => {
+    const previous = animator.action;
+    const next = rawPlay(key, options);
+    if (next && /^attack/.test(key || '')) {
+      // Explicit combo-carry weights must not be multiplied by stale Three.js
+      // crossfade interpolants. Stop fades only for attack transitions; normal
+      // locomotion crossfades stay untouched.
+      manager.state?.lastAttackAction?.stopFading?.();
+      previous?.stopFading?.();
+      next.stopFading?.();
+    }
+    return next;
+  };
 }
 
 function finishPulse(manager, type) {
@@ -44,6 +66,8 @@ export function installFrameInvariantRowanTransitions(game, manager) {
   if (!game?.player || !manager?.events) return manager;
 
   let updateContext = null;
+  let simulationTime = 0;
+  let lastAttackEndSimulationTime = -Infinity;
   const rawEmit = manager.events.emit.bind(manager.events);
   manager.events.emit = (type, detail = {}) => {
     const currentLocomotionEligible = locomotionEligible(game.player);
@@ -62,20 +86,30 @@ export function installFrameInvariantRowanTransitions(game, manager) {
       return { type, suppressed: true, ...detail };
     }
 
+    if (type === 'attack:anticipation' && Number.isFinite(lastAttackEndSimulationTime)) {
+      // RowanAnimationDirector currently reads lastAttackEndedAt using
+      // performance.now(). Re-anchor that value so its gap represents gameplay
+      // simulation time, not renderer wall time. A slow frame therefore cannot
+      // erase a valid queued combo transition.
+      const simulationGap = Math.max(0, simulationTime - lastAttackEndSimulationTime);
+      manager.lastAttackEndedAt = performance.now() * .001 - simulationGap;
+      manager.comboCarrySimulationGap = simulationGap;
+    }
+
     return rawEmit(type, detail);
   };
 
   const baseUpdate = game.player.update.bind(game.player);
   game.player.update = (...args) => {
     const dt = Math.max(.0001, args[0] || 0);
+    simulationTime += dt;
     const previousSpeed = game.player.speed || 0;
     const previousState = game.player.state;
     const startedInLocomotion = locomotionEligible(game.player, previousState);
     const startCount = manager.eventCounts['locomotion:start'] || 0;
     const stopCount = manager.eventCounts['locomotion:stop'] || 0;
 
-    // If gameplay has already interrupted an attack between frames, remove any
-    // residual combo blend before the director can sample it over hurt/dodge/cast.
+    installAnimatorFadeGuard(manager);
     if (previousState !== 'attack') clearInterruptedComboCarry(manager);
     if (previousState === 'dodge') clearFootContacts(manager);
 
@@ -92,6 +126,13 @@ export function installFrameInvariantRowanTransitions(game, manager) {
     const acceleration = (currentSpeed - previousSpeed) / dt;
     const state = manager.state;
     const eligible = startedInLocomotion && locomotionEligible(game.player, currentState);
+
+    // Install once the imported animator appears, including its first playable frame.
+    installAnimatorFadeGuard(manager);
+
+    if (previousState === 'attack' && currentState !== 'attack') {
+      lastAttackEndSimulationTime = simulationTime;
+    }
 
     if (currentState === 'dodge' || previousState === 'dodge') clearFootContacts(manager);
     if (currentState !== 'attack') clearInterruptedComboCarry(manager);
@@ -132,5 +173,7 @@ export function installFrameInvariantRowanTransitions(game, manager) {
   manager.frameInvariantTransitions = true;
   manager.transitionStateIsolation = true;
   manager.authoredActionPoseFinal = true;
+  manager.comboCarryUsesSimulationTime = true;
+  manager.comboCarryFadeGuard = true;
   return manager;
 }
