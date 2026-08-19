@@ -117,8 +117,6 @@ async function freezeAndNormalize(page) {
     g.player.root.rotation.y = 0;
     g.scene.updateMatrixWorld(true);
     g.camera.updateMatrixWorld(true);
-    // The animation loop is stopped for the frozen A/B scene, so synchronize the
-    // optimized nature batches explicitly after normalizing the authored wind pose.
     g.natureInstancingManager?.sync?.();
   });
 }
@@ -137,7 +135,6 @@ async function snapshot(page) {
     g.scene.traverse(node => {
       if (node.isLight && node.visible) visibleLights++;
       if (node.isDirectionalLight && node.castShadow) shadowMaps.push([node.shadow.mapSize.x, node.shadow.mapSize.y]);
-      // Hidden source meshes are retained only as exact culling proxies and do not render.
       if (!node.isMesh || !node.geometry || !node.visible) return;
       sceneMeshes++;
       if (node.isInstancedMesh) instancedMeshes++;
@@ -195,7 +192,7 @@ async function snapshot(page) {
 }
 
 async function prepareCase(page, optimized) {
-  const url = `${baseUrl}/?quality=high${optimized ? '' : '&perf=off'}`;
+  const url = `${baseUrl}/?${optimized ? '' : 'perf=off'}`;
   await page.goto(url, { waitUntil: 'networkidle' });
   await waitReady(page);
   await freezeAndNormalize(page);
@@ -241,7 +238,6 @@ async function interleavedRenderTimes(baselinePage, optimizedPage, pairs = 16) {
   const optimized = [];
 
   for (let i = 0; i < pairs; i++) {
-    // Alternate which case runs first so thermal/JIT/scheduler drift is balanced.
     if (i % 2 === 0) {
       baseline.push(await oneRenderTime(baselinePage));
       optimized.push(await oneRenderTime(optimizedPage));
@@ -277,9 +273,13 @@ const browser = await chromium.launch({
 
 let report;
 try {
-  // Device DPR 2 drives Game's authored high preset to its 1.8 renderer cap.
+  // Force the benchmark environment to meet the game's own high-quality desktop
+  // eligibility checks. This does not modify game code; the resulting renderer is
+  // still independently asserted to use the authored 1.8 DPR high preset.
   const context = await browser.newContext({ viewport: { width: 800, height: 450 }, deviceScaleFactor: 2 });
   await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, get: () => 8 });
+    Object.defineProperty(navigator, 'deviceMemory', { configurable: true, get: () => 8 });
     let seed = 0x5eed1234;
     Math.random = () => {
       seed |= 0;
@@ -327,7 +327,7 @@ try {
 
   report = {
     generatedAt: new Date().toISOString(),
-    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and authored high preset at renderer DPR 1.8. GPU-complete render timings are 16 interleaved baseline/optimized pairs with alternating order after warmup; live idle gameplay uses 48 post-warmup requestAnimationFrame samples per case.',
+    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and forced capable-desktop eligibility, exercising the game authored high preset at renderer DPR 1.8. GPU-complete render timings are 16 interleaved baseline/optimized pairs with alternating order after warmup; live idle gameplay uses 48 post-warmup requestAnimationFrame samples per case.',
     errors,
     baseline,
     optimized,
