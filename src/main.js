@@ -12,6 +12,7 @@ import { installRowanStyle } from './game/RowanStyle.js';
 import { installShowcasePass } from './game/ShowcasePass.js';
 import { installAnimationPolish } from './game/AnimationPolish.js';
 import { installShowcaseQualityGate } from './game/ShowcaseQualityGate.js';
+import { installPerformancePass } from './game/PerformancePass.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -27,6 +28,7 @@ installCinematicPolish(game);
 installShowcasePass(game);
 installAnimationPolish(game);
 installShowcaseQualityGate(game);
+const performancePass = installPerformancePass(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
@@ -45,6 +47,7 @@ function waitForCoreVisuals(timeoutMs = 15000) {
 }
 
 Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(() => {
+  performancePass.rebatch();
   enterButton.textContent = 'Enter the Glade';
   enterButton.disabled = false;
   enterButton.dataset.ready = 'true';
