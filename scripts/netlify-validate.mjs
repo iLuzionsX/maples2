@@ -23,6 +23,8 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
+await run('npm', ['run', 'test:animation:unit']);
+console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build']);
 await run('npx', ['playwright-core', 'install', 'chromium']);
 
