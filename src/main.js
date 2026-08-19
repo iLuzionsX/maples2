@@ -28,7 +28,8 @@ installCinematicPolish(game);
 installShowcasePass(game);
 installAnimationPolish(game);
 installShowcaseQualityGate(game);
-const performancePass = installPerformancePass(game);
+const performanceDisabled = new URLSearchParams(location.search).get('perf') === 'off';
+const performancePass = performanceDisabled ? null : installPerformancePass(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
@@ -47,7 +48,7 @@ function waitForCoreVisuals(timeoutMs = 15000) {
 }
 
 Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(() => {
-  performancePass.rebatch();
+  performancePass?.rebatch();
   enterButton.textContent = 'Enter the Glade';
   enterButton.disabled = false;
   enterButton.dataset.ready = 'true';
