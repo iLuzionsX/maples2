@@ -250,6 +250,7 @@ async function interleavedRenderTimes(baselinePage, optimizedPage, pairs = 16) {
 }
 
 async function liveFrameTimes(page, frames = 48) {
+  await page.bringToFront();
   await page.locator('#enter-btn').click();
   await page.evaluate(() => window.__MAPLES_GAME__.start());
   const result = await page.evaluate(async count => {
@@ -273,9 +274,6 @@ const browser = await chromium.launch({
 
 let report;
 try {
-  // Force the benchmark environment to meet the game's own high-quality desktop
-  // eligibility checks. This does not modify game code; the resulting renderer is
-  // still independently asserted to use the authored 1.8 DPR high preset.
   const context = await browser.newContext({ viewport: { width: 800, height: 450 }, deviceScaleFactor: 2 });
   await context.addInitScript(() => {
     Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, get: () => 8 });
@@ -327,7 +325,7 @@ try {
 
   report = {
     generatedAt: new Date().toISOString(),
-    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and forced capable-desktop eligibility, exercising the game authored high preset at renderer DPR 1.8. GPU-complete render timings are 16 interleaved baseline/optimized pairs with alternating order after warmup; live idle gameplay uses 48 post-warmup requestAnimationFrame samples per case.',
+    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and forced capable-desktop eligibility, exercising the authored high preset at renderer DPR 1.8. GPU-complete render timings are 16 interleaved baseline/optimized pairs with alternating order after warmup; each live idle gameplay sample is foregrounded and uses 48 post-warmup requestAnimationFrame frames.',
     errors,
     baseline,
     optimized,
