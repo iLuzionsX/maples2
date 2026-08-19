@@ -2,8 +2,10 @@ import * as THREE from 'three';
 
 const _inverseRoot = new THREE.Matrix4();
 const _instanceMatrix = new THREE.Matrix4();
+const _viewDecor = new THREE.Matrix4();
 const _projection = new THREE.Matrix4();
 const _frustum = new THREE.Frustum();
+const _sphere = new THREE.Sphere();
 
 function canInstance(mesh) {
   if (!mesh?.isMesh || mesh.isSkinnedMesh || mesh.isInstancedMesh || !mesh.visible) return false;
@@ -20,11 +22,13 @@ function collectSlots(root) {
   const slots = [];
   root.traverse(mesh => {
     if (!canInstance(mesh)) return;
+    if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
     slots.push({
       mesh,
       geometry: mesh.geometry,
       material: mesh.material,
       relative: new THREE.Matrix4().multiplyMatrices(_inverseRoot, mesh.matrixWorld),
+      localSphere: mesh.geometry.boundingSphere?.clone() || null,
       castShadow: mesh.castShadow,
       receiveShadow: mesh.receiveShadow,
       renderOrder: mesh.renderOrder,
@@ -48,9 +52,12 @@ function updateBatchMatrices(batchRecord, frustum = null) {
   let visibleCount = 0;
 
   for (let i = 0; i < entries.length; i++) {
-    const { root, relative, mesh, alwaysVisible } = entries[i];
-    if (frustum && !alwaysVisible && !frustum.intersectsObject(mesh)) continue;
+    const { root, relative, localSphere, alwaysVisible } = entries[i];
     _instanceMatrix.multiplyMatrices(root.matrix, relative);
+    if (frustum && !alwaysVisible && localSphere) {
+      _sphere.copy(localSphere).applyMatrix4(_instanceMatrix);
+      if (!frustum.intersectsSphere(_sphere)) continue;
+    }
     batch.setMatrixAt(visibleCount++, _instanceMatrix);
   }
 
@@ -80,7 +87,13 @@ export async function installNatureInstancing(game) {
       // once per frame instead of repeating the same work for every slot.
       for (const root of result.roots) root.updateMatrix();
 
-      _projection.multiplyMatrices(game.camera.projectionMatrix, game.camera.matrixWorldInverse);
+      // Build the camera frustum in decor-local space. Instance matrices are also decor-local,
+      // so culling uses the exact current wind transform without updating hidden source trees.
+      const decor = game.world.decor;
+      decor.updateWorldMatrix(true, false);
+      game.camera.updateWorldMatrix(true, false);
+      _viewDecor.multiplyMatrices(game.camera.matrixWorldInverse, decor.matrixWorld);
+      _projection.multiplyMatrices(game.camera.projectionMatrix, _viewDecor);
       _frustum.setFromProjectionMatrix(_projection);
 
       let visibleInstances = 0;
@@ -144,7 +157,7 @@ export async function installNatureInstancing(game) {
         batch.receiveShadow = first.receiveShadow;
         batch.renderOrder = first.renderOrder;
         batch.layers.mask = first.layers;
-        // We compact the batch using the exact source-mesh frustum test before every render.
+        // We compact the batch using exact geometry bounds before every render.
         batch.frustumCulled = false;
         batch.instanceMatrix.setUsage(THREE.StreamDrawUsage);
         batch.userData.performanceNatureBatch = true;
@@ -155,7 +168,7 @@ export async function installNatureInstancing(game) {
           entries: entriesForFlags.map(({ root, slot }) => ({
             root,
             relative: slot.relative,
-            mesh: slot.mesh,
+            localSphere: slot.localSphere,
             alwaysVisible: slot.alwaysVisible,
           })),
         };
@@ -174,7 +187,7 @@ export async function installNatureInstancing(game) {
 
   if (result.batches.length) {
     // Sync immediately before rendering. This preserves every authored wind/root transform,
-    // while per-source frustum tests preserve the original off-screen triangle culling.
+    // while exact geometry bounds preserve the original off-screen triangle culling.
     const previousSceneBeforeRender = game.scene.onBeforeRender;
     game.scene.onBeforeRender = function (...args) {
       previousSceneBeforeRender?.apply(this, args);
