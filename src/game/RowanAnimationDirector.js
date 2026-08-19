@@ -342,6 +342,14 @@ function detectTransitions(state, manager, player, dt, acceleration, turnRate) {
   }
   if (state.lastPlayerState === 'attack' && player.state !== 'attack') {
     manager.lastAttackEndedAt = nowSeconds();
+    if (state.trailActive) {
+      state.trailActive = false;
+      manager.events.emit('weapon-trail:end', {
+        combo: player.comboIndex,
+        serial: manager.attackSerial,
+        interrupted: player.state !== 'idle',
+      });
+    }
   }
 
   state.lastPlayerState = player.state;
@@ -603,10 +611,10 @@ function realignWeaponRibbon(player) {
 
 function updateDirector(game, manager, dt) {
   const player = game.player;
-  updateLogicalRootY(manager, player);
   const state = initializeRig(game, manager);
   if (!state) return;
 
+  updateLogicalRootY(manager, player);
   resetImportedRoot(state, player);
   const speed = player.speed || 0;
   const acceleration = dt > .0001 ? clamp((speed - state.lastSpeed) / dt, -24, 24) : 0;
