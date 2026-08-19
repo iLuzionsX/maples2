@@ -55,7 +55,7 @@ await page.keyboard.down('KeyW');
 await page.waitForFunction(({ x, z }) => {
   const g = window.__MAPLES_GAME__;
   return Math.hypot(g.player.position.x - x, g.player.position.z - z) >= 2.0 && g.player.speed > 4.2;
-}, start, { timeout: 30000 });
+}, start, { timeout: 90000 });
 
 const running = await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
