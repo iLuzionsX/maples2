@@ -134,9 +134,13 @@ export async function installNatureInstancing(game) {
       for (const entriesForFlags of groups.values()) {
         if (entriesForFlags.length < 2) continue;
         const first = entriesForFlags[0].slot;
+        // Off-screen casters can still affect visible pixels. Leave shadow-casting
+        // meshes on Three.js' native path so instancing never changes shadow coverage.
+        if (first.castShadow) continue;
+
         const batch = new THREE.InstancedMesh(first.geometry, first.material, entriesForFlags.length);
         batch.name = `PerformanceNature_${kind}_${slotIndex}_${entriesForFlags.length}`;
-        batch.castShadow = first.castShadow;
+        batch.castShadow = false;
         batch.receiveShadow = first.receiveShadow;
         batch.renderOrder = first.renderOrder;
         batch.layers.mask = first.layers;
