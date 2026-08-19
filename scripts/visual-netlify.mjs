@@ -15,9 +15,17 @@ chromium.launch = async (options = {}) => {
   return new Proxy(browser, {
     get(target, property, receiver) {
       if (property === 'newContext') {
-        return (contextOptions = {}) => {
+        return async (contextOptions = {}) => {
           const { recordVideo: _recordVideo, ...stableOptions } = contextOptions;
-          return baseNewContext(stableOptions);
+          const context = await baseNewContext(stableOptions);
+          // The desktop smoke test explicitly asserts the authored high preset. Netlify
+          // runner core-count reporting is infrastructure noise, so emulate the capable
+          // desktop that test is intended to represent before any game code executes.
+          await context.addInitScript(() => {
+            Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, get: () => 8 });
+            Object.defineProperty(navigator, 'deviceMemory', { configurable: true, get: () => 8 });
+          });
+          return context;
         };
       }
       const value = Reflect.get(target, property, receiver);
