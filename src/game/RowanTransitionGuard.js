@@ -31,42 +31,6 @@ function clearNonLocomotionPulses(manager) {
   finishPulse(manager, 'locomotion:direction-change');
 }
 
-function authoredHitClip(manager, player) {
-  if (player.state !== 'hurt' || !manager.hitResponse) return null;
-  const animator = manager.state?.animator;
-  if (!animator?.mixer || !animator.clips?.length) return null;
-
-  const hitA = animator.clips.find(clip => clip.name === 'Hit_A');
-  const hitB = animator.clips.find(clip => clip.name === 'Hit_B');
-  const response = manager.hitResponse;
-  // Use the authored alternate for impacts from Rowan's right/back side.
-  return response.side < -.05 || response.front < -.55 ? (hitB || hitA) : (hitA || hitB);
-}
-
-function resampleAuthoredActionPose(manager, player) {
-  const state = manager.state;
-  const animator = state?.animator;
-  if (!state || !animator?.mixer || !NON_LOCOMOTION_STATES.has(player.state)) return;
-
-  // The director runs after the normal RigAnimator. Sampling the mixer again here
-  // deliberately removes any locomotion-only additive lean/turn written during
-  // an action frame, leaving the imported authored action as the final body pose.
-  if (player.state === 'hurt') {
-    const clip = authoredHitClip(manager, player);
-    if (clip) {
-      const action = animator.mixer.clipAction(clip);
-      const progress = Math.max(0, Math.min(1, player.stateTime / Math.max(.01, player.stateDuration || .28)));
-      if (animator.action && animator.action !== action) animator.action.setEffectiveWeight(0);
-      action.enabled = true;
-      action.paused = true;
-      action.setEffectiveWeight(1);
-      action.time = clip.duration * Math.min(.98, progress);
-      manager.directionalHitClip = clip.name;
-    }
-  }
-  animator.mixer.update(0);
-}
-
 export function installFrameInvariantRowanTransitions(game, manager) {
   if (!game?.player || !manager?.events) return manager;
 
@@ -80,8 +44,9 @@ export function installFrameInvariantRowanTransitions(game, manager) {
       ['locomotion:start', 'locomotion:stop', 'locomotion:direction-change'].includes(type) &&
       (!currentLocomotionEligible || !startedInLocomotion)
     ) {
-      // detectTransitions resets its pulse immediately before emitting. Restore
-      // the completed value here so the suppressed event cannot still alter pose.
+      // The director may reset a pulse immediately before emitting. Restore the
+      // completed value when an action-state event is suppressed so it cannot
+      // leak into the next authored pose.
       finishPulse(manager, type);
       return { type, suppressed: true, ...detail };
     }
@@ -126,7 +91,10 @@ export function installFrameInvariantRowanTransitions(game, manager) {
       if (previousState === 'dodge' && currentState !== 'idle') {
         finishPulse(manager, 'dodge:recover');
       }
-      resampleAuthoredActionPose(manager, game.player);
+      // Do not re-sample the mixer here. RowanAnimationDirector now gates
+      // locomotion overlays before action poses and orders combo carry before
+      // the attack overlay, so a post-director mixer sample would erase the
+      // authored attack/hit corrections and foot placement.
       return result;
     }
 
