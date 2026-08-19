@@ -33,9 +33,14 @@ const preview = spawn(
 
 try {
   await ready();
+  await run('npm', ['run', 'test:movement']);
+  console.log('MOVEMENT SUITE PASS');
+  await run('node', ['scripts/visual-netlify.mjs']);
+  console.log('VISUAL SUITE PASS');
   await run('node', ['scripts/performance-observe.mjs']);
   await run('node', ['scripts/perf-threshold.mjs']);
   console.log('FULL-QUALITY PERFORMANCE A/B COMPLETE');
+  console.log('NETLIFY SHOWCASE VALIDATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
