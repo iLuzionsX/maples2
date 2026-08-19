@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const EMPTY = Object.freeze([]);
 const _inverseDecor = new THREE.Matrix4();
+const _instanceMatrix = new THREE.Matrix4();
 
 function textureId(texture) {
   return texture?.uuid || '';
@@ -148,6 +149,108 @@ function batchStaticDecor(game, stats) {
   return { batchedMeshes, batches, savedDrawCalls };
 }
 
+function natureCell(root) {
+  const angle = Math.atan2(root.position.z, root.position.x) + Math.PI;
+  const sector = Math.floor(angle / (Math.PI * 2) * 8) & 7;
+  const radial = Math.hypot(root.position.x, root.position.z) < 15 ? 0 : 1;
+  return `${sector}:${radial}`;
+}
+
+function canBatchNatureMesh(mesh) {
+  if (!mesh.isMesh || mesh.isSkinnedMesh || mesh.isInstancedMesh || !mesh.visible) return false;
+  if (!mesh.geometry || !mesh.material || Array.isArray(mesh.material)) return false;
+  if (mesh.material.transparent || mesh.material.opacity < .999 || mesh.material.blending !== THREE.NormalBlending) return false;
+  if (mesh.morphTargetInfluences?.length) return false;
+  if (mesh.geometry.morphAttributes && Object.values(mesh.geometry.morphAttributes).some(list => list?.length)) return false;
+  return true;
+}
+
+function buildNatureBatches(game, stats, state) {
+  const manager = game.natureAssetManager;
+  if (!manager?.ready || state.ready || !manager.instances?.length) return null;
+
+  const decor = game.world.decor;
+  const groups = new Map();
+  for (const root of manager.instances) {
+    const cell = natureCell(root);
+    root.traverse(mesh => {
+      if (!canBatchNatureMesh(mesh)) return;
+      const key = [
+        mesh.geometry.uuid,
+        mesh.material.uuid,
+        mesh.castShadow ? 1 : 0,
+        mesh.receiveShadow ? 1 : 0,
+        mesh.renderOrder || 0,
+        mesh.layers.mask,
+        mesh.customDepthMaterial?.uuid || '',
+        mesh.customDistanceMaterial?.uuid || '',
+        cell,
+      ].join('::');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(mesh);
+    });
+  }
+
+  decor.updateMatrixWorld(true);
+  _inverseDecor.copy(decor.matrixWorld).invert();
+
+  let sourceMeshes = 0;
+  let batches = 0;
+  let savedDrawCalls = 0;
+
+  for (const entries of groups.values()) {
+    if (entries.length < 2) continue;
+    const first = entries[0];
+    const batch = new THREE.InstancedMesh(first.geometry, first.material, entries.length);
+    batch.name = `PerformanceNature_${first.geometry.name || first.geometry.type}_${entries.length}`;
+    batch.castShadow = first.castShadow;
+    batch.receiveShadow = first.receiveShadow;
+    batch.renderOrder = first.renderOrder;
+    batch.layers.mask = first.layers.mask;
+    batch.customDepthMaterial = first.customDepthMaterial || null;
+    batch.customDistanceMaterial = first.customDistanceMaterial || null;
+    batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    for (let i = 0; i < entries.length; i++) {
+      _instanceMatrix.multiplyMatrices(_inverseDecor, entries[i].matrixWorld);
+      batch.setMatrixAt(i, _instanceMatrix);
+      entries[i].visible = false;
+    }
+    batch.instanceMatrix.needsUpdate = true;
+    batch.computeBoundingBox();
+    batch.computeBoundingSphere();
+    if (batch.boundingSphere) batch.boundingSphere.radius += 1;
+    batch.frustumCulled = true;
+    decor.add(batch);
+
+    state.batches.push({ batch, entries });
+    sourceMeshes += entries.length;
+    batches++;
+    savedDrawCalls += entries.length - 1;
+  }
+
+  state.ready = batches > 0;
+  stats.natureMeshesBatched += sourceMeshes;
+  stats.natureBatches += batches;
+  stats.natureEstimatedDrawCallsSaved += savedDrawCalls;
+  return { sourceMeshes, batches, savedDrawCalls };
+}
+
+function updateNatureBatches(game, state) {
+  if (!state.ready) return;
+  const decor = game.world.decor;
+  decor.updateMatrixWorld(true);
+  _inverseDecor.copy(decor.matrixWorld).invert();
+
+  for (const { batch, entries } of state.batches) {
+    for (let i = 0; i < entries.length; i++) {
+      _instanceMatrix.multiplyMatrices(_inverseDecor, entries[i].matrixWorld);
+      batch.setMatrixAt(i, _instanceMatrix);
+    }
+    batch.instanceMatrix.needsUpdate = true;
+  }
+}
+
 function installHudCache(game, stats) {
   const cache = Object.create(null);
   game._updateHUD = () => {
@@ -237,7 +340,8 @@ function installScratchMath(game) {
 
 function optimizeShowcaseUpdate(game, stats) {
   const pass = game.showcasePass;
-  if (!pass?.root || pass.userData?.performanceWrapped) return;
+  if (!pass?.root || pass._performanceWrapped) return;
+  pass._performanceWrapped = true;
 
   const motes = [];
   pass.root.traverse(object => { if (object.userData?.showcaseMote) motes.push(object); });
@@ -272,18 +376,30 @@ export function installPerformancePass(game) {
     batchedMeshes: 0,
     instancedBatches: 0,
     estimatedDrawCallsSaved: 0,
+    natureMeshesBatched: 0,
+    natureBatches: 0,
+    natureEstimatedDrawCallsSaved: 0,
     hudFrames: 0,
     showcaseFrames: 0,
   };
+  const natureState = { ready: false, batches: [] };
 
   installHudCache(game, stats);
   installScratchMath(game);
   optimizeShowcaseUpdate(game, stats);
 
+  const baseRender = game._render.bind(game);
+  game._render = () => {
+    updateNatureBatches(game, natureState);
+    baseRender();
+  };
+
   const pass = {
     stats,
     rebatch() {
-      const result = batchStaticDecor(game, stats);
+      const staticResult = batchStaticDecor(game, stats);
+      const natureResult = buildNatureBatches(game, stats, natureState);
+      const result = { static: staticResult, nature: natureResult };
       console.info('[Maples performance]', result, stats);
       return result;
     },
