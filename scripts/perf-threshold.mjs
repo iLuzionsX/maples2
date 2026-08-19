@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const report = JSON.parse(fs.readFileSync(path.resolve('dist/perf-report.json'), 'utf8'));
 const targets = {
+  pixelRatio: 1.8,
   drawCallReductionPct: 20,
   renderImprovementPct: 3,
   liveFpsRegressionFloorPct: -3,
@@ -13,6 +14,12 @@ if (report.failures?.some(message => /quality|pixel|pageerror|console/i.test(mes
   failures.push(...report.failures.filter(message => /quality|pixel|pageerror|console/i.test(message)));
 }
 if (!report.qualityInvariant) failures.push('quality invariant failed');
+for (const [label, value] of [
+  ['baseline', report.baseline?.quality?.pixelRatio],
+  ['optimized', report.optimized?.quality?.pixelRatio],
+]) {
+  if (Math.abs((value ?? 0) - targets.pixelRatio) > .001) failures.push(`${label} pixel ratio ${value} != ${targets.pixelRatio}`);
+}
 
 const baselineRenderedTriangles = report.baseline?.renderedTriangles ?? 0;
 const optimizedRenderedTriangles = report.optimized?.renderedTriangles ?? 0;
