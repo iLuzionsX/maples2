@@ -185,7 +185,8 @@ async function runCase(browser, name, contextOptions, expectHigh) {
   });
 
   try {
-    await page.goto(`${baseUrl}/?perf=off&capture=1`, { waitUntil: 'networkidle' });
+    const quality = expectHigh ? 'high' : 'low';
+    await page.goto(`${baseUrl}/?perf=off&quality=${quality}`, { waitUntil: 'networkidle' });
     await waitForGame(page, expectHigh);
 
     const qualityBefore = await qualitySnapshot(page);
@@ -226,7 +227,7 @@ async function runCase(browser, name, contextOptions, expectHigh) {
 const report = {
   generatedAt: new Date().toISOString(),
   status: 'running',
-  methodology: 'Same loaded scene before/after installPerformancePass; animation loop stopped; three forced GPU-complete renders per phase; SwiftShader on Netlify Chromium. Desktop keeps the authored high preset and 1.8 renderer pixel ratio at an 800x450 viewport to bound CI cost.',
+  methodology: 'Same loaded scene before/after installPerformancePass; animation loop stopped; three forced GPU-complete renders per phase; SwiftShader on Netlify Chromium. Desktop uses the authored high preset at 1.8 renderer pixel ratio; mobile uses the authored low preset at 1.15. The desktop viewport is 800x450 to bound CI cost without lowering renderer quality settings.',
 };
 
 let browser;
