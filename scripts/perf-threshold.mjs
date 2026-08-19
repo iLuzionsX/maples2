@@ -10,6 +10,7 @@ const targets = {
 };
 
 const failures = [];
+if (!report.baseline || !report.optimized) failures.push('benchmark baseline/optimized case missing');
 if (report.failures?.some(message => /quality|pixel|pageerror|console/i.test(message))) {
   failures.push(...report.failures.filter(message => /quality|pixel|pageerror|console/i.test(message)));
 }
