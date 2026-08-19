@@ -6,12 +6,21 @@ const env = { ...process.env };
 const sourcePath = path.resolve('tests/performance-ab.mjs');
 const runtimePath = path.resolve('tests/.performance-ab-high-dpr.mjs');
 const source = fs.readFileSync(sourcePath, 'utf8');
-const highDprSource = source.replace(
+let runtimeSource = source;
+
+runtimeSource = runtimeSource.replace(
   "viewport: { width: 800, height: 450 }, deviceScaleFactor: 1",
   "viewport: { width: 800, height: 450 }, deviceScaleFactor: 2",
 );
-if (highDprSource === source) throw new Error('Could not apply high-DPR benchmark override');
-fs.writeFileSync(runtimePath, highDprSource);
+runtimeSource = runtimeSource.replace(
+  "if (!node.isMesh || !node.geometry) return;",
+  "if (!node.isMesh || !node.geometry || !node.visible) return;",
+);
+
+if (runtimeSource === source) throw new Error('Could not apply benchmark runtime corrections');
+if (!runtimeSource.includes('deviceScaleFactor: 2')) throw new Error('High-DPR benchmark override was not applied');
+if (!runtimeSource.includes('!node.geometry || !node.visible')) throw new Error('Visible-geometry benchmark correction was not applied');
+fs.writeFileSync(runtimePath, runtimeSource);
 
 let code;
 try {
