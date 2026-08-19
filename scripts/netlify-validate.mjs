@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const baseUrl = 'http://127.0.0.1:4173';
@@ -11,25 +10,6 @@ function run(command, args) {
     child.on('exit', code => code === 0
       ? resolve()
       : reject(new Error(`${command} ${args.join(' ')} exited ${code}`)));
-  });
-}
-
-function runCaptured(label, command, args) {
-  return new Promise((resolve, reject) => {
-    let output = `\n===== ${label} =====\n`;
-    const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], env, shell: false });
-    const collect = chunk => {
-      const text = String(chunk);
-      output += text;
-      process.stdout.write(text);
-    };
-    child.stdout.on('data', collect);
-    child.stderr.on('data', collect);
-    child.on('error', reject);
-    child.on('exit', code => {
-      output += `\n[exit code: ${code}]\n`;
-      resolve({ label, code, output });
-    });
   });
 }
 
@@ -55,17 +35,13 @@ const preview = spawn(
 
 try {
   await ready();
-  const result = await runCaptured('ROWAN ANIMATION BROWSER SUITE', 'node', ['tests/rowan-animation-e2e.mjs']);
-  const summary = `${result.label}: ${result.code === 0 ? 'PASS' : `FAIL (${result.code})`}`;
-  const diagnostics = [
-    'TEMPORARY ROWAN-ONLY NETLIFY VALIDATION DIAGNOSTICS',
-    `commit: ${process.env.COMMIT_REF || 'unknown'}`,
-    summary,
-    result.output,
-  ].join('\n');
-  fs.writeFileSync('dist/validation-diagnostics.txt', diagnostics);
-  console.log(summary);
-  console.log('ROWAN-ONLY DIAGNOSTIC PREVIEW PUBLISHED; strict validation will be restored before approval.');
+  await run('npm', ['run', 'test:movement']);
+  console.log('MOVEMENT SUITE PASS');
+  await run('node', ['tests/rowan-animation-e2e.mjs']);
+  console.log('ROWAN ANIMATION BROWSER SUITE PASS');
+  await run('node', ['scripts/visual-netlify.mjs']);
+  console.log('VISUAL SUITE PASS');
+  console.log('NETLIFY SHOWCASE VALIDATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
