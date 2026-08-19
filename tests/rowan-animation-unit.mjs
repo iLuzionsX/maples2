@@ -38,4 +38,4 @@ const right = localHitResponse(0, 1, 0, 0, 0);
 assert.ok(right.side > .99 && Math.abs(right.front) < .001, 'right-side hit classifies as right');
 
 console.log('Rowan animation math: PASS');
-// Strict Netlify validation trigger for the current Rowan animation head.
+// Diagnostic Netlify A/B retrigger after the strict current-head failure.
