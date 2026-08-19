@@ -14,10 +14,19 @@ function run(command, args) {
   });
 }
 
-function runCaptured(label, command, args) {
+function runCaptured(label, command, args, timeoutMs = 90000) {
   return new Promise(resolve => {
     let output = `\n===== ${label} =====\n`;
+    let settled = false;
     const child = spawn(command, args, { stdio: ['ignore', 'pipe', 'pipe'], env, shell: false });
+    const finish = (code, extra = '') => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      output += extra;
+      output += `\n[exit code: ${code}]\n`;
+      resolve({ label, code, output });
+    };
     const collect = chunk => {
       const text = String(chunk);
       output += text;
@@ -25,14 +34,14 @@ function runCaptured(label, command, args) {
     };
     child.stdout.on('data', collect);
     child.stderr.on('data', collect);
-    child.on('error', error => {
-      output += `\n[spawn error: ${error.stack || error}]\n`;
-      resolve({ label, code: -1, output });
-    });
-    child.on('exit', code => {
-      output += `\n[exit code: ${code}]\n`;
-      resolve({ label, code, output });
-    });
+    child.on('error', error => finish(-1, `\n[spawn error: ${error.stack || error}]\n`));
+    child.on('exit', code => finish(code));
+    const timer = setTimeout(() => {
+      output += `\n[TIMEOUT after ${timeoutMs}ms — terminating suite]\n`;
+      child.kill('SIGTERM');
+      setTimeout(() => child.kill('SIGKILL'), 2500).unref();
+      finish(124);
+    }, timeoutMs);
   });
 }
 
@@ -58,11 +67,11 @@ const preview = spawn(
 try {
   await ready();
   const results = [];
-  results.push(await runCaptured('MOVEMENT SUITE', 'npm', ['run', 'test:movement']));
-  results.push(await runCaptured('ROWAN ANIMATION BROWSER SUITE', 'node', ['tests/rowan-animation-e2e.mjs']));
-  results.push(await runCaptured('VISUAL SUITE', 'node', ['scripts/visual-netlify.mjs']));
-  results.push(await runCaptured('PERFORMANCE OBSERVE', 'node', ['scripts/performance-observe.mjs']));
-  results.push(await runCaptured('PERFORMANCE THRESHOLD', 'node', ['scripts/perf-threshold.mjs']));
+  results.push(await runCaptured('MOVEMENT SUITE', 'npm', ['run', 'test:movement'], 90000));
+  results.push(await runCaptured('ROWAN ANIMATION BROWSER SUITE', 'node', ['tests/rowan-animation-e2e.mjs'], 90000));
+  results.push(await runCaptured('VISUAL SUITE', 'node', ['scripts/visual-netlify.mjs'], 90000));
+  results.push(await runCaptured('PERFORMANCE OBSERVE', 'node', ['scripts/performance-observe.mjs'], 150000));
+  results.push(await runCaptured('PERFORMANCE THRESHOLD', 'node', ['scripts/perf-threshold.mjs'], 30000));
 
   const summary = results.map(result => `${result.label}: ${result.code === 0 ? 'PASS' : `FAIL (${result.code})`}`).join('\n');
   const diagnostics = [
