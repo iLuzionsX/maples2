@@ -18,10 +18,12 @@ await page.waitForFunction(() => {
   const g = window.__MAPLES_GAME__;
   return Boolean(
     g?.assetVisualManager?.heroReady &&
-    g?.rowanAnimationDirector?.ready &&
     document.querySelector('#enter-btn')?.dataset.ready === 'true'
   );
 }, null, { timeout: 60000 });
+
+await page.locator('#enter-btn').click();
+await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__?.rowanAnimationDirector?.ready), null, { timeout: 30000 });
 
 const boot = await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
@@ -43,7 +45,6 @@ for (const key of ['idle', 'walk', 'run', 'turnLeft', 'turnRight', 'deathPose'])
   if (!boot.clipCoverage?.[key]) errors.push(`Missing authored Rowan clip coverage: ${key}`);
 }
 
-await page.locator('#enter-btn').click();
 await page.waitForTimeout(100);
 
 const start = await page.evaluate(() => {
