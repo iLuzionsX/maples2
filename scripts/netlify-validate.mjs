@@ -37,6 +37,8 @@ try {
   console.log('MOVEMENT SUITE PASS');
   await run('node', ['scripts/visual-netlify.mjs']);
   console.log('VISUAL SUITE PASS');
+  await run('node', ['tests/performance-ab.mjs']);
+  console.log('PERFORMANCE A/B PASS');
   console.log('NETLIFY SHOWCASE VALIDATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
