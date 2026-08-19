@@ -18,26 +18,29 @@ for (const [label, value] of [
   ['baseline', report.baseline?.quality?.pixelRatio],
   ['optimized', report.optimized?.quality?.pixelRatio],
 ]) {
-  if (Math.abs((value ?? 0) - targets.pixelRatio) > .001) failures.push(`${label} pixel ratio ${value} != ${targets.pixelRatio}`);
+  if (!Number.isFinite(value) || Math.abs(value - targets.pixelRatio) > .001) failures.push(`${label} pixel ratio ${value} != ${targets.pixelRatio}`);
 }
 
 const baselineRenderedTriangles = report.baseline?.renderedTriangles ?? 0;
 const optimizedRenderedTriangles = report.optimized?.renderedTriangles ?? 0;
 const renderedTriangleDeltaPct = Math.abs(optimizedRenderedTriangles - baselineRenderedTriangles) / Math.max(1, baselineRenderedTriangles) * 100;
-if (renderedTriangleDeltaPct > .01) failures.push(`rendered triangle delta ${renderedTriangleDeltaPct}%`);
+if (!Number.isFinite(renderedTriangleDeltaPct) || renderedTriangleDeltaPct > .01) failures.push(`rendered triangle delta ${renderedTriangleDeltaPct}%`);
 
-if (!report.visualDiff?.comparable || report.visualDiff.changedPixelRatio > .03 || report.visualDiff.meanAbsoluteChannelDiff > .75) {
+if (!report.visualDiff?.comparable || !Number.isFinite(report.visualDiff.changedPixelRatio) || !Number.isFinite(report.visualDiff.meanAbsoluteChannelDiff) || report.visualDiff.changedPixelRatio > .03 || report.visualDiff.meanAbsoluteChannelDiff > .75) {
   failures.push('visual fingerprint invariant failed');
 }
 
+const finiteDrawCalls = Number.isFinite(report.drawCallReductionPct);
+const finiteRender = Number.isFinite(report.renderImprovementPct);
+const finiteLiveFps = Number.isFinite(report.liveFpsImprovementPct);
 const progress = {
   drawCallReductionPct: report.drawCallReductionPct,
   renderImprovementPct: report.renderImprovementPct,
   liveFpsImprovementPct: report.liveFpsImprovementPct,
   renderedTriangleDeltaPct,
-  drawCallTargetMet: (report.drawCallReductionPct ?? -Infinity) >= targets.drawCallReductionPct,
-  renderTargetMet: (report.renderImprovementPct ?? -Infinity) >= targets.renderImprovementPct,
-  liveFpsFloorMet: (report.liveFpsImprovementPct ?? -Infinity) >= targets.liveFpsRegressionFloorPct,
+  drawCallTargetMet: finiteDrawCalls && report.drawCallReductionPct >= targets.drawCallReductionPct,
+  renderTargetMet: finiteRender && report.renderImprovementPct >= targets.renderImprovementPct,
+  liveFpsFloorMet: finiteLiveFps && report.liveFpsImprovementPct >= targets.liveFpsRegressionFloorPct,
 };
 
 if (!progress.drawCallTargetMet) failures.push(`draw-call reduction ${report.drawCallReductionPct}% < ${targets.drawCallReductionPct}%`);
