@@ -242,10 +242,11 @@ async function attachPlayer(player) {
 }
 
 function monsterSettings(kind, isBoss) {
-  if (isBoss) return { height: 3.35, lift: 0, tint: 0x6b4639, tintAmount: .18, rotation: Math.PI };
-  if (kind === 'ghost') return { height: 1.5, lift: .28, tint: 0x5fbca8, tintAmount: .18, rotation: Math.PI };
-  if (kind === 'bat') return { height: 1.16, lift: .72, tint: 0x546f5f, tintAmount: .2, rotation: Math.PI };
-  return { height: 1.48, lift: 0, tint: 0x6e8d59, tintAmount: .2, rotation: Math.PI };
+  // These Quaternius rigs are authored facing +Z, the same forward convention Enemy.root uses.
+  if (isBoss) return { height: 3.35, lift: 0, tint: 0x6b4639, tintAmount: .18, rotation: 0 };
+  if (kind === 'ghost') return { height: 1.5, lift: .28, tint: 0x5fbca8, tintAmount: .18, rotation: 0 };
+  if (kind === 'bat') return { height: 1.16, lift: .72, tint: 0x546f5f, tintAmount: .2, rotation: 0 };
+  return { height: 1.48, lift: 0, tint: 0x6e8d59, tintAmount: .2, rotation: 0 };
 }
 
 async function attachEnemy(enemy, kind) {
