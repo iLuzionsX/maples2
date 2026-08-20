@@ -1,5 +1,5 @@
 [build]
-  command = "node scripts/netlify-validate.mjs"
+  command = "node tests/enemy-facing-unit.mjs && node scripts/netlify-validate.mjs"
   publish = "dist"
 
 [[headers]]
