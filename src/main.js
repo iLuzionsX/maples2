@@ -58,7 +58,7 @@ function waitForCoreVisuals(timeoutMs = 15000) {
 Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(async () => {
   if (performancePass) {
     performancePass.rebatch();
-    performanceExtensions?.batchShadowCasters();
+    performanceExtensions?.freezeStaticDecor();
     await installNatureInstancing(game);
   }
   enterButton.textContent = 'Enter the Glade';
