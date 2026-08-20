@@ -12,8 +12,12 @@ import { installRowanStyle } from './game/RowanStyle.js';
 import { installShowcasePass } from './game/ShowcasePass.js';
 import { installAnimationPolish } from './game/AnimationPolish.js';
 import { installRowanAnimationDirector } from './game/RowanAnimationDirector.js';
+import { installRowanRigCompatibility } from './game/RowanRigCompatibility.js';
 import { installFrameInvariantRowanTransitions } from './game/RowanTransitionGuard.js';
 import { installShowcaseQualityGate } from './game/ShowcaseQualityGate.js';
+import { installPerformancePass } from './game/PerformancePass.js';
+import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
+import { installNatureInstancing } from './game/NatureInstancing.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -29,8 +33,13 @@ installCinematicPolish(game);
 installShowcasePass(game);
 installAnimationPolish(game);
 const rowanAnimationDirector = installRowanAnimationDirector(game);
+installRowanRigCompatibility(game, rowanAnimationDirector);
 installFrameInvariantRowanTransitions(game, rowanAnimationDirector);
 installShowcaseQualityGate(game);
+// Zero-quality-loss FPS pass remains opt-out only for deterministic A/B validation and final handoff validation.
+const performanceDisabled = new URLSearchParams(location.search).get('perf') === 'off';
+const performancePass = performanceDisabled ? null : installPerformancePass(game);
+const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
@@ -48,7 +57,12 @@ function waitForCoreVisuals(timeoutMs = 15000) {
   });
 }
 
-Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(() => {
+Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(async () => {
+  if (performancePass) {
+    performancePass.rebatch();
+    performanceExtensions?.freezeStaticDecor();
+    await installNatureInstancing(game);
+  }
   enterButton.textContent = 'Enter the Glade';
   enterButton.disabled = false;
   enterButton.dataset.ready = 'true';
