@@ -1,74 +1,6 @@
 import * as THREE from 'three';
 
 const EMPTY = Object.freeze([]);
-const _inverseDecor = new THREE.Matrix4();
-const _viewProjection = new THREE.Matrix4();
-const _cameraFrusta = new WeakMap();
-
-function textureId(texture) {
-  return texture?.uuid || '';
-}
-
-function colorId(color) {
-  return color?.isColor ? color.getHexString() : '';
-}
-
-function materialSignature(material) {
-  if (!material || Array.isArray(material) || material.visible === false) return null;
-  if (material.transparent || material.opacity < .999 || material.blending !== THREE.NormalBlending) return null;
-  if (!material.isMeshStandardMaterial && !material.isMeshBasicMaterial && !material.isMeshLambertMaterial && !material.isMeshPhongMaterial) return null;
-  if (material.clippingPlanes?.length || material.stencilWrite) return null;
-
-  return [
-    material.type,
-    colorId(material.color),
-    colorId(material.emissive),
-    material.emissiveIntensity ?? '',
-    material.roughness ?? '',
-    material.metalness ?? '',
-    material.side,
-    material.shadowSide ?? '',
-    material.flatShading ? 1 : 0,
-    material.vertexColors ? 1 : 0,
-    material.alphaTest ?? 0,
-    material.depthTest ? 1 : 0,
-    material.depthWrite ? 1 : 0,
-    material.depthFunc ?? '',
-    material.colorWrite ? 1 : 0,
-    material.toneMapped ? 1 : 0,
-    material.fog ? 1 : 0,
-    material.wireframe ? 1 : 0,
-    material.polygonOffset ? 1 : 0,
-    material.polygonOffsetFactor ?? 0,
-    material.polygonOffsetUnits ?? 0,
-    material.premultipliedAlpha ? 1 : 0,
-    material.dithering ? 1 : 0,
-    material.alphaToCoverage ? 1 : 0,
-    material.envMapIntensity ?? '',
-    material.aoMapIntensity ?? '',
-    material.lightMapIntensity ?? '',
-    material.normalScale?.x ?? '',
-    material.normalScale?.y ?? '',
-    textureId(material.map),
-    textureId(material.normalMap),
-    textureId(material.roughnessMap),
-    textureId(material.metalnessMap),
-    textureId(material.aoMap),
-    textureId(material.emissiveMap),
-    textureId(material.alphaMap),
-    textureId(material.bumpMap),
-    material.bumpScale ?? '',
-    textureId(material.displacementMap),
-    textureId(material.lightMap),
-    textureId(material.envMap),
-  ].join('|');
-}
-
-function geometrySignature(geometry) {
-  if (!geometry || geometry.morphAttributes && Object.values(geometry.morphAttributes).some(list => list?.length)) return null;
-  if (geometry.parameters) return `${geometry.type}:${JSON.stringify(geometry.parameters)}`;
-  return `uuid:${geometry.uuid}`;
-}
 
 function buildDynamicRoots(game) {
   const roots = new Set();
@@ -77,6 +9,7 @@ function buildDynamicRoots(game) {
 
   if (world.portal) roots.add(world.portal);
   for (const firefly of world.fireflies || EMPTY) roots.add(firefly);
+  if (showcase?.root) roots.add(showcase.root);
   if (showcase?.water) roots.add(showcase.water);
   for (const foam of showcase?.foam || EMPTY) roots.add(foam);
   for (const group of showcase?.swayGroups || EMPTY) roots.add(group);
@@ -86,60 +19,29 @@ function buildDynamicRoots(game) {
   return roots;
 }
 
-function isStaticShadowMesh(mesh, game, dynamicRoots) {
-  if (!mesh.isMesh || mesh.isSkinnedMesh || mesh.isInstancedMesh || !mesh.visible || !mesh.castShadow) return false;
-  if (mesh.customDepthMaterial || mesh.customDistanceMaterial) return false;
-  if (mesh.userData?.showcaseMote || mesh.userData?.assetNature) return false;
+function belongsToDynamicSubtree(node, decor, dynamicRoots) {
+  for (let current = node; current && current !== decor; current = current.parent) {
+    if (dynamicRoots.has(current) || current.userData?.assetNature || current.userData?.showcaseMote) return true;
+  }
+  return false;
+}
 
+function freezeStaticDecorMatrices(game, stats) {
   const decor = game.world.decor;
-  for (let node = mesh; node && node !== decor; node = node.parent) {
-    if (!node.visible || dynamicRoots.has(node) || node.userData?.assetNature) return false;
-  }
-  return true;
-}
+  const dynamicRoots = buildDynamicRoots(game);
+  decor.updateMatrixWorld(true);
 
-function sourceBoundingSphere(mesh) {
-  if (mesh.boundingSphere !== undefined) {
-    if (mesh.boundingSphere === null && typeof mesh.computeBoundingSphere === 'function') mesh.computeBoundingSphere();
-    return mesh.boundingSphere || null;
-  }
-  if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
-  return mesh.geometry.boundingSphere || null;
-}
+  let frozen = 0;
+  decor.traverse(node => {
+    if (node === decor || belongsToDynamicSubtree(node, decor, dynamicRoots)) return;
+    if (node.isSkinnedMesh || node.isBone) return;
+    node.matrixAutoUpdate = false;
+    node.matrixWorldAutoUpdate = false;
+    frozen++;
+  });
 
-function getCameraFrustum(camera) {
-  let state = _cameraFrusta.get(camera);
-  if (!state) {
-    state = { matrix: new THREE.Matrix4(), frustum: new THREE.Frustum(), version: 0 };
-    _cameraFrusta.set(camera, state);
-  }
-
-  _viewProjection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-  if (!state.matrix.equals(_viewProjection)) {
-    state.matrix.copy(_viewProjection);
-    state.frustum.setFromProjectionMatrix(state.matrix);
-    state.version++;
-  }
-  return state;
-}
-
-function syncShadowBatch(record, camera) {
-  if (!camera) return;
-  const cameraState = getCameraFrustum(camera);
-  if (record.lastCamera === camera && record.lastCameraVersion === cameraState.version) return;
-
-  const { batch, entries } = record;
-  let visibleCount = 0;
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    if (!entry.alwaysVisible && entry.worldSphere && !cameraState.frustum.intersectsSphere(entry.worldSphere)) continue;
-    batch.setMatrixAt(visibleCount++, entry.matrix);
-  }
-
-  batch.count = visibleCount;
-  if (visibleCount > 0) batch.instanceMatrix.needsUpdate = true;
-  record.lastCamera = camera;
-  record.lastCameraVersion = cameraState.version;
+  stats.frozenStaticObjects = frozen;
+  return frozen;
 }
 
 function installRuntimeHotPaths(game, stats) {
@@ -249,8 +151,6 @@ function installRuntimeHotPaths(game, stats) {
       }
     }
 
-    // Preserve the original array-replacement behavior on removal frames, but avoid
-    // allocating a fresh array during every normal gameplay frame.
     if (hasRemoved) game.enemies = game.enemies.filter(e => !e.remove);
 
     if (game.player.dead) {
@@ -300,90 +200,6 @@ function installRuntimeHotPaths(game, stats) {
   };
 }
 
-function batchStaticShadowCasters(game, stats, records) {
-  const decor = game.world.decor;
-  const dynamicRoots = buildDynamicRoots(game);
-  const groups = new Map();
-
-  decor.updateMatrixWorld(true);
-  _inverseDecor.copy(decor.matrixWorld).invert();
-
-  decor.traverse(mesh => {
-    if (!isStaticShadowMesh(mesh, game, dynamicRoots)) return;
-    const geometryKey = geometrySignature(mesh.geometry);
-    const materialKey = materialSignature(mesh.material);
-    if (!geometryKey || !materialKey) return;
-
-    const localMatrix = new THREE.Matrix4().multiplyMatrices(_inverseDecor, mesh.matrixWorld);
-    if (localMatrix.determinant() <= 0) return;
-    const sourceSphere = sourceBoundingSphere(mesh);
-    const worldSphere = sourceSphere?.clone().applyMatrix4(mesh.matrixWorld) || null;
-    const key = [
-      geometryKey,
-      materialKey,
-      mesh.receiveShadow ? 1 : 0,
-      mesh.renderOrder || 0,
-      mesh.layers.mask,
-    ].join('::');
-
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push({
-      mesh,
-      matrix: localMatrix,
-      worldSphere,
-      alwaysVisible: mesh.frustumCulled === false,
-    });
-  });
-
-  let batchedMeshes = 0;
-  let batches = 0;
-  let savedDrawCalls = 0;
-
-  for (const entries of groups.values()) {
-    if (entries.length < 3) continue;
-    const first = entries[0].mesh;
-    const batch = new THREE.InstancedMesh(first.geometry, first.material, entries.length);
-    batch.name = `PerformanceShadowBatch_${first.geometry.type}_${entries.length}`;
-    batch.castShadow = true;
-    batch.receiveShadow = first.receiveShadow;
-    batch.renderOrder = first.renderOrder;
-    batch.layers.mask = first.layers.mask;
-    // Per-source culling is applied in the render and shadow callbacks below.
-    batch.frustumCulled = false;
-    batch.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    batch.userData.performanceShadowBatch = true;
-    decor.add(batch);
-
-    const record = {
-      batch,
-      entries,
-      lastCamera: null,
-      lastCameraVersion: -1,
-    };
-
-    batch.onBeforeRender = (renderer, object, camera) => syncShadowBatch(record, camera);
-    batch.onBeforeShadow = (renderer, object, camera, shadowCamera) => syncShadowBatch(record, shadowCamera);
-    records.push(record);
-
-    for (const { mesh } of entries) {
-      mesh.visible = false;
-      // These transforms are static and are retained only as source/proxy data. Avoid
-      // recomputing their local/world matrices during the scene walk every frame.
-      mesh.matrixAutoUpdate = false;
-      mesh.matrixWorldAutoUpdate = false;
-    }
-
-    batchedMeshes += entries.length;
-    batches++;
-    savedDrawCalls += entries.length - 1;
-  }
-
-  stats.shadowBatchedMeshes += batchedMeshes;
-  stats.shadowBatches += batches;
-  stats.shadowEstimatedDrawCallsSaved += savedDrawCalls;
-  return { batchedMeshes, batches, savedDrawCalls };
-}
-
 export function installPerformanceExtensions(game) {
   if (game.performanceExtensions) return game.performanceExtensions;
 
@@ -391,26 +207,18 @@ export function installPerformanceExtensions(game) {
     enemyFrames: 0,
     projectileFrames: 0,
     pickupFrames: 0,
-    shadowBatchedMeshes: 0,
-    shadowBatches: 0,
-    shadowEstimatedDrawCallsSaved: 0,
+    frozenStaticObjects: 0,
   };
-  const shadowBatches = [];
 
   installRuntimeHotPaths(game, stats);
 
   const extension = {
     stats,
-    shadowBatches,
-    batchShadowCasters() {
-      if (shadowBatches.length) return {
-        batchedMeshes: stats.shadowBatchedMeshes,
-        batches: stats.shadowBatches,
-        savedDrawCalls: stats.shadowEstimatedDrawCallsSaved,
-      };
-      const result = batchStaticShadowCasters(game, stats, shadowBatches);
-      console.info('[Maples performance extensions]', result, stats);
-      return result;
+    freezeStaticDecor() {
+      if (stats.frozenStaticObjects) return stats.frozenStaticObjects;
+      const frozen = freezeStaticDecorMatrices(game, stats);
+      console.info('[Maples performance extensions]', { frozenStaticObjects: frozen }, stats);
+      return frozen;
     },
   };
 
