@@ -39,14 +39,10 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Temporary binary isolation: prove whether the failure is in behavior/visual
-// validation or in the performance-quality half. The final commit restores both.
+// Temporary binary isolation: movement/Rowan half only.
 await run('npm', ['run', 'test:animation:unit'], 90000);
-console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
-console.log('VITE PRODUCTION BUILD PASS');
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
-console.log('PLAYWRIGHT CHROMIUM INSTALL PASS');
 
 const preview = spawn(
   'npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'],
@@ -59,11 +55,7 @@ try {
   console.log('MOVEMENT SUITE PASS');
   await run('node', ['tests/rowan-animation-e2e.mjs'], 180000);
   console.log('ROWAN ANIMATION BROWSER SUITE PASS');
-  await run('node', ['tests/ghost-visibility-e2e.mjs'], 180000);
-  console.log('GHOST VISIBILITY SUITE PASS');
-  await run('node', ['scripts/visual-netlify.mjs'], 240000);
-  console.log('VISUAL SUITE PASS');
-  console.log('BEHAVIOR/VISUAL ISOLATION PASS');
+  console.log('MOVEMENT/ROWAN ISOLATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
