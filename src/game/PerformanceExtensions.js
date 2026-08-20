@@ -47,7 +47,6 @@ function freezeStaticDecorMatrices(game, stats) {
 function installRuntimeHotPaths(game, stats) {
   const projectileTarget = new THREE.Vector3();
   const damagePosition = new THREE.Vector3();
-  const separation = new THREE.Vector3();
   const pickupVector = new THREE.Vector3();
 
   game._updateProjectiles = dt => {
@@ -93,86 +92,6 @@ function installRuntimeHotPaths(game, stats) {
     stats.projectileFrames++;
   };
 
-  game._updateEnemies = (dt, realDt) => {
-    let hasRemoved = false;
-    for (const e of game.enemies) {
-      e.update(dt, game.player);
-      game.world.clampToArena(e.position);
-      if (e.remove) hasRemoved = true;
-
-      if (e.attackEvent && !game.player.dead) {
-        const dist = e.position.distanceTo(game.player.position);
-        const hitRange = e.isBoss ? 4.35 : 1.75;
-        if (dist < hitRange) {
-          if (game.player.takeDamage(e.damage, e.position)) {
-            game.ui.damageFlash.classList.add('hit');
-            setTimeout(() => game.ui.damageFlash.classList.remove('hit'), 55);
-            game.cameraShake = Math.max(game.cameraShake, e.isBoss ? .78 : .42);
-            game.hitStop = e.isBoss ? .055 : .035;
-          }
-        }
-      }
-
-      if (e.dead && !e.userDataRewarded) {
-        e.userDataRewarded = true;
-        if (e.isBoss) {
-          game.victoryTimer = 1.65;
-          game.ui.bossFill.style.transform = 'scaleX(0)';
-          game.toast('ANCIENT WARDEN DEFEATED', 1.5);
-          game.cameraShake = .8;
-          game.fx.levelUp(e.position);
-        } else {
-          game.kills++;
-          game._spawnEssence(e.position, e.reward);
-          game._updateQuest();
-          if (game.kills >= game.objectiveKills && !game.boss && !game.bossPending) {
-            game.bossPending = true;
-            game.bossTimer = 1.8;
-            game.toast('The forest is answering…', 1.6);
-          }
-        }
-      }
-    }
-
-    for (let i = 0; i < game.enemies.length; i++) {
-      for (let j = i + 1; j < game.enemies.length; j++) {
-        const a = game.enemies[i];
-        const b = game.enemies[j];
-        if (a.dead || b.dead) continue;
-        separation.copy(a.position).sub(b.position);
-        separation.y = 0;
-        const len = separation.length();
-        const min = a.radius + b.radius + .25;
-        if (len > 0 && len < min) {
-          separation.multiplyScalar((min - len) / len * .035);
-          a.position.add(separation);
-          b.position.sub(separation);
-        }
-      }
-    }
-
-    if (hasRemoved) game.enemies = game.enemies.filter(e => !e.remove);
-
-    if (game.player.dead) {
-      game.respawnTimer += realDt;
-      if (game.respawnTimer > 1.6) {
-        game.player.dead = false;
-        game.player.hp = game.player.maxHp;
-        game.player.mana = game.player.maxMana;
-        game.player.state = 'idle';
-        game.player.stateTime = 0;
-        game.player.root.rotation.set(0, game.player.facing, 0);
-        game.player.rig.body.rotation.set(0, 0, 0);
-        game.player.rig.head.rotation.set(0, 0, 0);
-        game.player.setPosition(0, 0, 9);
-        game.respawnTimer = 0;
-        game.toast('The grove restores you', 1.2);
-        game.fx.levelUp(game.player.position);
-      }
-    }
-    stats.enemyFrames++;
-  };
-
   game._updatePickups = dt => {
     for (let i = game.pickups.length - 1; i >= 0; i--) {
       const p = game.pickups[i];
@@ -204,12 +123,14 @@ export function installPerformanceExtensions(game) {
   if (game.performanceExtensions) return game.performanceExtensions;
 
   const stats = {
-    enemyFrames: 0,
     projectileFrames: 0,
     pickupFrames: 0,
     frozenStaticObjects: 0,
   };
 
+  // Deliberately do not replace game._updateEnemies here. CinematicPolish and
+  // AnimationPolish wrap that method to style asynchronously attached GLB enemies
+  // and bosses. Preserving those wrappers is part of the zero-quality-loss contract.
   installRuntimeHotPaths(game, stats);
 
   const extension = {
