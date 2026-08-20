@@ -221,6 +221,7 @@ async function warmRender(page, count = 4) {
 }
 
 async function oneRenderTime(page) {
+  await page.bringToFront();
   return page.evaluate(() => {
     const g = window.__MAPLES_GAME__;
     const gl = g.renderer.getContext();
@@ -347,7 +348,7 @@ try {
 
   report = {
     generatedAt: new Date().toISOString(),
-    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and forced capable-desktop eligibility, exercising the authored high preset at renderer DPR 1.8. GPU-complete render timings use 16 interleaved baseline/optimized pairs with alternating order after warmup. Live idle gameplay uses eight alternating foreground blocks per case, six measured requestAnimationFrame intervals per block after four foreground warmup frames, for 48 interleaved samples per case.',
+    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and forced capable-desktop eligibility, exercising the authored high preset at renderer DPR 1.8. GPU-complete render timings use 16 interleaved foregrounded baseline/optimized pairs with alternating order after warmup. Live idle gameplay uses eight alternating foreground blocks per case, six measured requestAnimationFrame intervals per block after four foreground warmup frames, for 48 interleaved samples per case.',
     errors,
     baseline,
     optimized,
