@@ -249,22 +249,45 @@ async function interleavedRenderTimes(baselinePage, optimizedPage, pairs = 16) {
   return { baseline, optimized };
 }
 
-async function liveFrameTimes(page, frames = 48) {
+async function startLiveCase(page) {
   await page.bringToFront();
   await page.locator('#enter-btn').click();
   await page.evaluate(() => window.__MAPLES_GAME__.start());
-  const result = await page.evaluate(async count => {
+}
+
+async function liveFrameBlock(page, frames = 6, warmupFrames = 4) {
+  await page.bringToFront();
+  return page.evaluate(async ({ count, warmup }) => {
     const deltas = [];
     let last = await new Promise(resolve => requestAnimationFrame(resolve));
-    for (let i = 0; i < count + 8; i++) {
+    for (let i = 0; i < count + warmup; i++) {
       const now = await new Promise(resolve => requestAnimationFrame(resolve));
-      if (i >= 8) deltas.push(now - last);
+      if (i >= warmup) deltas.push(now - last);
       last = now;
     }
     return deltas;
-  }, frames);
-  await page.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
-  return result;
+  }, { count: frames, warmup: warmupFrames });
+}
+
+async function interleavedLiveFrameTimes(baselinePage, optimizedPage, blocks = 8, framesPerBlock = 6) {
+  await startLiveCase(baselinePage);
+  await startLiveCase(optimizedPage);
+  const baseline = [];
+  const optimized = [];
+
+  for (let i = 0; i < blocks; i++) {
+    if (i % 2 === 0) {
+      baseline.push(...await liveFrameBlock(baselinePage, framesPerBlock));
+      optimized.push(...await liveFrameBlock(optimizedPage, framesPerBlock));
+    } else {
+      optimized.push(...await liveFrameBlock(optimizedPage, framesPerBlock));
+      baseline.push(...await liveFrameBlock(baselinePage, framesPerBlock));
+    }
+  }
+
+  await baselinePage.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
+  await optimizedPage.evaluate(() => window.__MAPLES_GAME__.renderer.setAnimationLoop(null));
+  return { baseline, optimized };
 }
 
 const browser = await chromium.launch({
@@ -302,13 +325,12 @@ try {
   const baseline = await prepareCase(baselinePage, false);
   const optimized = await prepareCase(optimizedPage, true);
   const renderSamples = await interleavedRenderTimes(baselinePage, optimizedPage, 16);
-  const baselineLive = await liveFrameTimes(baselinePage);
-  const optimizedLive = await liveFrameTimes(optimizedPage);
+  const liveSamples = await interleavedLiveFrameTimes(baselinePage, optimizedPage, 8, 6);
 
   baseline.renderMedianMs = median(renderSamples.baseline);
   optimized.renderMedianMs = median(renderSamples.optimized);
-  baseline.liveMedianMs = median(baselineLive);
-  optimized.liveMedianMs = median(optimizedLive);
+  baseline.liveMedianMs = median(liveSamples.baseline);
+  optimized.liveMedianMs = median(liveSamples.optimized);
   baseline.liveMedianFps = 1000 / baseline.liveMedianMs;
   optimized.liveMedianFps = 1000 / optimized.liveMedianMs;
 
@@ -325,7 +347,7 @@ try {
 
   report = {
     generatedAt: new Date().toISOString(),
-    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and forced capable-desktop eligibility, exercising the authored high preset at renderer DPR 1.8. GPU-complete render timings are 16 interleaved baseline/optimized pairs with alternating order after warmup; each live idle gameplay sample is foregrounded and uses 48 post-warmup requestAnimationFrame frames.',
+    methodology: 'Two concurrently prepared Chromium pages with deterministic RNG and forced capable-desktop eligibility, exercising the authored high preset at renderer DPR 1.8. GPU-complete render timings use 16 interleaved baseline/optimized pairs with alternating order after warmup. Live idle gameplay uses eight alternating foreground blocks per case, six measured requestAnimationFrame intervals per block after four foreground warmup frames, for 48 interleaved samples per case.',
     errors,
     baseline,
     optimized,
@@ -340,6 +362,11 @@ try {
       countPerCase: renderSamples.baseline.length,
       baselineMedianMs: baseline.renderMedianMs,
       optimizedMedianMs: optimized.renderMedianMs,
+    },
+    liveSamples: {
+      countPerCase: liveSamples.baseline.length,
+      baselineMedianMs: baseline.liveMedianMs,
+      optimizedMedianMs: optimized.liveMedianMs,
     },
   };
 
