@@ -2,37 +2,248 @@ import * as THREE from 'three';
 import { Enemy } from './Enemy.js';
 import { localHitResponse } from './RowanAnimationMath.js';
 import {
+  clamp01,
   hitSpringEnvelope,
-  playerAttackTiming,
+  impulsePulse,
+  playerComboPose,
+  playerMotionPose,
   velocityPlaybackScale,
 } from './AnimationTiming.js';
 
 const Q = THREE.Quaternion;
 const E = THREE.Euler;
+const damp = THREE.MathUtils.damp;
 const enemyManagers = new WeakMap();
 let enemyPrototypePatched = false;
 
-function addLocalRotation(node, x, y, z, scratch) {
-  if (!node || (!x && !y && !z)) return;
-  scratch.euler.set(x, y, z, 'XYZ');
+function wrapAngle(angle) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+function addLocalRotation(node, x, y, z, scratch, scale = 1) {
+  if (!node || scale === 0 || (!x && !y && !z)) return;
+  scratch.euler.set(x * scale, y * scale, z * scale, 'XYZ');
   scratch.quaternion.setFromEuler(scratch.euler);
   node.quaternion.multiply(scratch.quaternion);
 }
 
-function findTorsoNode(root) {
-  let best = null;
+function applyPart(node, part, scratch, scale = 1) {
+  if (!part) return;
+  addLocalRotation(node, part.x || 0, part.y || 0, part.z || 0, scratch, scale);
+}
+
+function findRigNode(root, patterns, { bonesOnly = true } = {}) {
+  let found = null;
   root?.traverse(node => {
-    if (best || !node.name) return;
+    if (found || !node.name || (bonesOnly && !node.isBone)) return;
     const name = node.name.toLowerCase();
-    if (node.isBone && /(chest|spine2|spine_2|upperbody|upper_body)/.test(name)) best = node;
+    if (patterns.some(pattern => pattern.test(name))) found = node;
   });
-  if (best) return best;
-  root?.traverse(node => {
-    if (best || !node.name) return;
-    const name = node.name.toLowerCase();
-    if (node.isBone && /(spine|hips|pelvis|body)/.test(name)) best = node;
+  return found;
+}
+
+function findSideBone(root, part, side) {
+  const letter = side === 'left' ? 'l' : 'r';
+  const word = side;
+  const patterns = part === 'upperArm'
+    ? [
+        new RegExp(`upper.?arm[._ -]?${letter}$`, 'i'),
+        new RegExp(`${word}.*upper.?arm`, 'i'),
+        new RegExp(`upper.?arm.*${word}`, 'i'),
+        new RegExp(`arm[._ -]?${letter}$`, 'i'),
+      ]
+    : [
+        new RegExp(`lower.?arm[._ -]?${letter}$`, 'i'),
+        new RegExp(`fore.?arm[._ -]?${letter}$`, 'i'),
+        new RegExp(`${word}.*(lower.?arm|fore.?arm)`, 'i'),
+        new RegExp(`(lower.?arm|fore.?arm).*${word}`, 'i'),
+      ];
+  return findRigNode(root, patterns);
+}
+
+function findEnemyRig(root) {
+  return {
+    hips: findRigNode(root, [/hips/i, /pelvis/i, /root/i]),
+    torso: findRigNode(root, [/chest/i, /spine.?2/i, /upper.?body/i]) || findRigNode(root, [/spine/i, /body/i]),
+    head: findRigNode(root, [/head/i, /neck/i]),
+    upperArmL: findSideBone(root, 'upperArm', 'left'),
+    upperArmR: findSideBone(root, 'upperArm', 'right'),
+  };
+}
+
+function ensurePlayerRig(game, manager) {
+  const directorState = game.rowanAnimationDirector?.state;
+  const model = game.player.assetVisual;
+  if (!directorState?.bones || !model) return null;
+  if (manager.playerRig?.model === model) return manager.playerRig;
+
+  const rig = {
+    model,
+    hips: directorState.bones.hips,
+    spine: directorState.bones.spine,
+    chest: directorState.bones.chest,
+    head: directorState.bones.head,
+    upperLegL: directorState.bones.upperLegL,
+    upperLegR: directorState.bones.upperLegR,
+    lowerLegL: directorState.bones.lowerLegL,
+    lowerLegR: directorState.bones.lowerLegR,
+    upperArmL: findSideBone(model, 'upperArm', 'left'),
+    upperArmR: findSideBone(model, 'upperArm', 'right'),
+    lowerArmL: findSideBone(model, 'lowerArm', 'left'),
+    lowerArmR: findSideBone(model, 'lowerArm', 'right'),
+  };
+  manager.playerRig = rig;
+  manager.playerRigCoverage = {
+    core: [rig.hips, rig.spine, rig.chest, rig.head].filter(Boolean).length,
+    arms: [rig.upperArmL, rig.upperArmR, rig.lowerArmL, rig.lowerArmR].filter(Boolean).length,
+    legs: [rig.upperLegL, rig.upperLegR, rig.lowerLegL, rig.lowerLegR].filter(Boolean).length,
+  };
+  return rig;
+}
+
+function updatePlayerMotion(manager, player, dt) {
+  const motion = manager.motion;
+  const speed = player.speed || 0;
+  const rawAcceleration = dt > .0001 ? (speed - motion.previousSpeed) / dt : 0;
+  const rawTurnRate = dt > .0001 ? wrapAngle((player.facing || 0) - motion.previousFacing) / dt : 0;
+  const sin = Math.sin(player.facing || 0);
+  const cos = Math.cos(player.facing || 0);
+  const vx = player.velocity?.x || 0;
+  const vz = player.velocity?.z || 0;
+  const lateralSpeed = vx * cos - vz * sin;
+
+  motion.acceleration = damp(motion.acceleration, THREE.MathUtils.clamp(rawAcceleration, -24, 24), 14, dt);
+  motion.turnRate = damp(motion.turnRate, THREE.MathUtils.clamp(rawTurnRate, -16, 16), 16, dt);
+  motion.lateralSpeed = damp(motion.lateralSpeed, lateralSpeed, 15, dt);
+  motion.previousSpeed = speed;
+  motion.previousFacing = player.facing || 0;
+
+  const pose = playerMotionPose({
+    speed,
+    acceleration: motion.acceleration,
+    lateralSpeed: motion.lateralSpeed,
+    turnRate: motion.turnRate,
   });
-  return best;
+  motion.energy = pose.energy;
+  manager.peakMotionEnergy = Math.max(manager.peakMotionEnergy, pose.energy);
+  manager.lastMotionPose = pose;
+  return pose;
+}
+
+function locomotionPresentationEligible(player) {
+  return !player.dead && !['attack', 'dodge', 'hurt', 'cast', 'dead'].includes(player.state);
+}
+
+function applyPlayerMotionLayer(rig, manager, player, pose) {
+  if (!locomotionPresentationEligible(player)) return;
+  const scale = player.speed > .2 ? 1 : .35;
+  applyPart(rig.hips, pose.hips, manager.scratch, scale);
+  applyPart(rig.spine, pose.spine, manager.scratch, scale);
+  applyPart(rig.chest, pose.chest, manager.scratch, scale);
+  applyPart(rig.head, pose.head, manager.scratch, scale);
+  manager.motionFrames++;
+}
+
+function applyTransitionImpulses(rig, manager) {
+  const pulse = manager.pulses;
+  const start = impulsePulse(pulse.start, .24);
+  const stop = impulsePulse(pulse.stop, .30);
+  const pivot = impulsePulse(pulse.pivot, .22) * pulse.pivotSign;
+  const landing = impulsePulse(pulse.landing, .26);
+
+  if (start > 0) {
+    addLocalRotation(rig.hips, -.055 * start, 0, 0, manager.scratch);
+    addLocalRotation(rig.spine, -.075 * start, 0, 0, manager.scratch);
+    addLocalRotation(rig.chest, -.06 * start, 0, 0, manager.scratch);
+    manager.locomotionImpulseFrames++;
+  }
+  if (stop > 0) {
+    addLocalRotation(rig.hips, .055 * stop, 0, 0, manager.scratch);
+    addLocalRotation(rig.spine, .085 * stop, 0, 0, manager.scratch);
+    addLocalRotation(rig.chest, .07 * stop, 0, 0, manager.scratch);
+    addLocalRotation(rig.upperLegL, .05 * stop, 0, 0, manager.scratch);
+    addLocalRotation(rig.upperLegR, .05 * stop, 0, 0, manager.scratch);
+    manager.locomotionImpulseFrames++;
+  }
+  if (pivot !== 0) {
+    addLocalRotation(rig.hips, 0, .04 * pivot, -.055 * pivot, manager.scratch);
+    addLocalRotation(rig.spine, 0, .065 * pivot, -.08 * pivot, manager.scratch);
+    addLocalRotation(rig.chest, 0, .08 * pivot, -.095 * pivot, manager.scratch);
+    addLocalRotation(rig.head, 0, -.04 * pivot, .045 * pivot, manager.scratch);
+    manager.locomotionImpulseFrames++;
+  }
+  if (landing > 0) {
+    addLocalRotation(rig.hips, .07 * landing, 0, 0, manager.scratch);
+    addLocalRotation(rig.spine, .045 * landing, 0, 0, manager.scratch);
+    addLocalRotation(rig.head, -.028 * landing, 0, 0, manager.scratch);
+    addLocalRotation(rig.upperLegL, .10 * landing, 0, 0, manager.scratch);
+    addLocalRotation(rig.upperLegR, .10 * landing, 0, 0, manager.scratch);
+    addLocalRotation(rig.lowerLegL, -.13 * landing, 0, 0, manager.scratch);
+    addLocalRotation(rig.lowerLegR, -.13 * landing, 0, 0, manager.scratch);
+    manager.locomotionImpulseFrames++;
+  }
+}
+
+function applyPlayerAttackLayer(rig, manager, player) {
+  if (player.state !== 'attack') {
+    manager.contactAlignmentActive = false;
+    manager.lastAttackImpact = 0;
+    return;
+  }
+
+  const progress = player.stateTime / Math.max(.01, player.stateDuration);
+  const pose = playerComboPose(player.comboIndex, progress);
+  const { timing } = pose;
+  applyPart(rig.hips, pose.hips, manager.scratch);
+  applyPart(rig.spine, pose.spine, manager.scratch);
+  applyPart(rig.chest, pose.chest, manager.scratch);
+  applyPart(rig.head, pose.head, manager.scratch);
+  applyPart(rig.upperArmR, pose.upperArmR, manager.scratch);
+  applyPart(rig.lowerArmR, pose.lowerArmR, manager.scratch);
+  applyPart(rig.upperArmL, pose.upperArmL, manager.scratch);
+  applyPart(rig.lowerArmL, pose.lowerArmL, manager.scratch);
+  applyPart(rig.upperLegL, pose.upperLegL, manager.scratch);
+  applyPart(rig.upperLegR, pose.upperLegR, manager.scratch);
+  applyPart(rig.lowerLegL, pose.lowerLegL, manager.scratch);
+  applyPart(rig.lowerLegR, pose.lowerLegR, manager.scratch);
+
+  manager.contactAlignmentActive = timing.impact > .02;
+  manager.lastAttackContact = timing.contact;
+  manager.lastAttackImpact = timing.impact;
+  manager.lastComboIndex = player.comboIndex;
+  manager.comboPoseFrames++;
+  manager.peakComboImpact = Math.max(manager.peakComboImpact, timing.impact);
+}
+
+function applyIdleLife(rig, manager, player, dt) {
+  if (player.state !== 'idle' || player.speed >= .18) return;
+  manager.idleClock += dt;
+  const breath = Math.sin(manager.idleClock * 2.05);
+  const weight = Math.sin(manager.idleClock * .71 + .8);
+  addLocalRotation(rig.chest, breath * .0068, weight * .0045, weight * .0025, manager.scratch);
+  addLocalRotation(rig.head, -breath * .003, -weight * .006, weight * .0035, manager.scratch);
+  addLocalRotation(rig.upperArmL, breath * .0025, 0, weight * .002, manager.scratch);
+  addLocalRotation(rig.upperArmR, -breath * .0025, 0, -weight * .002, manager.scratch);
+  manager.idleLifeFrames++;
+}
+
+function tickPulses(manager, dt) {
+  manager.pulses.start += dt;
+  manager.pulses.stop += dt;
+  manager.pulses.pivot += dt;
+  manager.pulses.landing += dt;
+}
+
+function updatePlayerPresentation(game, manager, dt) {
+  const player = game.player;
+  const rig = ensurePlayerRig(game, manager);
+  if (!rig) return;
+  tickPulses(manager, dt);
+  const motionPose = updatePlayerMotion(manager, player, dt);
+  applyPlayerMotionLayer(rig, manager, player, motionPose);
+  applyTransitionImpulses(rig, manager);
+  applyPlayerAttackLayer(rig, manager, player);
+  applyIdleLife(rig, manager, player, dt);
 }
 
 function patchEnemyAnimator(enemy, state, manager) {
@@ -66,17 +277,106 @@ function ensureEnemyState(enemy, manager) {
     return state;
   }
 
+  const bones = findEnemyRig(enemy.assetVisual);
   state = {
     model: enemy.assetVisual,
-    torso: findTorsoNode(enemy.assetVisual),
+    bones,
     animator: null,
     lastPlaybackScale: 1,
+    lastState: enemy.state,
+    clock: 0,
     scratch: { quaternion: new Q(), euler: new E() },
   };
   enemy._animationNextLevel = state;
   patchEnemyAnimator(enemy, state, manager);
   manager.enemyVisualsReady++;
+  if (bones.torso) manager.enemyTorsoRigsReady++;
+  if (enemy.isBoss) manager.bossVisualsReady++;
   return state;
+}
+
+function applyEnemyStatePose(enemy, state, manager, dt) {
+  const bones = state.bones;
+  const torso = bones.torso;
+  if (!torso) return;
+  state.clock += dt;
+
+  if (state.lastState !== enemy.state) {
+    manager.enemyStateTransitions++;
+    if (enemy.state === 'windup') manager.enemyWindups++;
+    if (enemy.state === 'attack') manager.enemyAttacks++;
+    if (enemy.state === 'recover') manager.enemyRecovers++;
+    state.lastState = enemy.state;
+  }
+
+  const speed = Math.hypot(enemy.velocity?.x || 0, enemy.velocity?.z || 0);
+  if (enemy.state === 'chase') {
+    const speed01 = clamp01(speed / Math.max(.4, enemy.speed || 2.2));
+    const gait = Math.sin(state.clock * (enemy.isBoss ? 5.2 : 8.1));
+    addLocalRotation(torso, -speed01 * (enemy.isBoss ? .035 : .045), 0, gait * speed01 * (enemy.isBoss ? .012 : .018), state.scratch);
+    addLocalRotation(bones.head, speed01 * .012, 0, -gait * speed01 * .01, state.scratch);
+    manager.enemyLocomotionPoseFrames++;
+  }
+
+  const progress = clamp01(enemy.stateTime / Math.max(.01, enemy.stateDuration || 1));
+  if (enemy.state === 'windup') {
+    const wind = Math.sin(progress * Math.PI * .5);
+    const weight = enemy.isBoss ? 1.35 : 1;
+    addLocalRotation(torso, .10 * wind * weight, 0, -.025 * wind, state.scratch);
+    addLocalRotation(bones.head, -.045 * wind * weight, 0, .018 * wind, state.scratch);
+    addLocalRotation(bones.upperArmL, -.075 * wind * weight, 0, -.035 * wind, state.scratch);
+    addLocalRotation(bones.upperArmR, -.075 * wind * weight, 0, .035 * wind, state.scratch);
+    manager.enemyStatePoseFrames++;
+  } else if (enemy.state === 'attack') {
+    const drive = Math.sin(Math.PI * clamp01(progress / .72));
+    const weight = enemy.isBoss ? 1.28 : 1;
+    addLocalRotation(torso, -.14 * drive * weight, 0, .035 * drive, state.scratch);
+    addLocalRotation(bones.head, .05 * drive * weight, 0, -.02 * drive, state.scratch);
+    addLocalRotation(bones.upperArmL, .08 * drive, 0, -.025 * drive, state.scratch);
+    addLocalRotation(bones.upperArmR, .08 * drive, 0, .025 * drive, state.scratch);
+    manager.enemyStatePoseFrames++;
+  } else if (enemy.state === 'recover') {
+    const recover = impulsePulse(enemy.stateTime, enemy.stateDuration || .46);
+    const weight = enemy.isBoss ? 1.22 : 1;
+    addLocalRotation(torso, .07 * recover * weight, 0, -.018 * recover, state.scratch);
+    addLocalRotation(bones.head, -.03 * recover * weight, 0, .012 * recover, state.scratch);
+    manager.enemyStatePoseFrames++;
+  } else if (enemy.state === 'dead') {
+    const collapse = clamp01(progress);
+    addLocalRotation(torso, .10 * collapse * (enemy.isBoss ? 1.2 : 1), 0, .08 * collapse, state.scratch);
+    addLocalRotation(bones.head, -.05 * collapse, 0, -.06 * collapse, state.scratch);
+    manager.enemyDeathPoseFrames++;
+  }
+
+  if (enemy.isBoss && ['windup', 'attack', 'recover'].includes(enemy.state)) manager.bossPresentationFrames++;
+}
+
+function applyEnemyFlinch(enemy, state, manager, dt) {
+  const hit = enemy._animationNextLevelHit;
+  if (!hit) return;
+  hit.elapsed += dt;
+  const envelope = hitSpringEnvelope(hit.elapsed, hit.duration);
+  if (envelope > 0 && state.bones.torso) {
+    const strength = hit.strength * envelope;
+    addLocalRotation(
+      state.bones.torso,
+      hit.front * .12 * strength,
+      hit.side * .055 * strength,
+      -hit.side * .16 * strength,
+      state.scratch,
+    );
+    addLocalRotation(
+      state.bones.head,
+      -hit.front * .055 * strength,
+      -hit.side * .035 * strength,
+      hit.side * .075 * strength,
+      state.scratch,
+    );
+    addLocalRotation(state.bones.upperArmL, .025 * strength, 0, hit.side * .035 * strength, state.scratch);
+    addLocalRotation(state.bones.upperArmR, .025 * strength, 0, hit.side * .035 * strength, state.scratch);
+    manager.enemyFlinchFrames++;
+  }
+  if (hit.elapsed >= hit.duration) enemy._animationNextLevelHit = null;
 }
 
 function updateEnemyPresentation(enemy, dt) {
@@ -84,25 +384,8 @@ function updateEnemyPresentation(enemy, dt) {
   if (!manager || enemy.remove) return;
   const state = ensureEnemyState(enemy, manager);
   if (!state) return;
-
-  const hit = enemy._animationNextLevelHit;
-  if (hit) {
-    hit.elapsed += dt;
-    const envelope = hitSpringEnvelope(hit.elapsed, hit.duration);
-    if (envelope > 0) {
-      const target = state.torso || state.model;
-      const strength = hit.strength * envelope;
-      addLocalRotation(
-        target,
-        hit.front * .105 * strength,
-        hit.side * .045 * strength,
-        -hit.side * .14 * strength,
-        state.scratch,
-      );
-      manager.enemyFlinchFrames++;
-    }
-    if (hit.elapsed >= hit.duration) enemy._animationNextLevelHit = null;
-  }
+  applyEnemyStatePose(enemy, state, manager, dt);
+  applyEnemyFlinch(enemy, state, manager, dt);
 }
 
 function patchEnemyPrototype() {
@@ -117,10 +400,10 @@ function patchEnemyPrototype() {
     const result = baseTakeHit.call(this, damage, from, crit);
     if (result) {
       const manager = enemyManagers.get(this);
-      const strength = (this.isBoss ? .72 : 1) * (crit ? 1.22 : 1);
+      const strength = (this.isBoss ? .78 : 1) * (crit ? 1.28 : 1);
       this._animationNextLevelHit = {
         elapsed: 0,
-        duration: this.isBoss ? .28 : .22,
+        duration: this.dead ? (this.isBoss ? .36 : .26) : (this.isBoss ? .31 : .23),
         front: response.front,
         side: response.side,
         strength,
@@ -138,43 +421,6 @@ function patchEnemyPrototype() {
   };
 }
 
-function applyPlayerContactLayer(game, manager, dt) {
-  const player = game.player;
-  const director = game.rowanAnimationDirector;
-  const state = director?.state;
-  const bones = state?.bones;
-  if (!bones || !player.assetVisual) return;
-
-  if (player.state === 'attack') {
-    const progress = player.stateTime / Math.max(.01, player.stateDuration);
-    const timing = playerAttackTiming(player.comboIndex, progress);
-    const side = player.comboIndex === 0 ? -1 : player.comboIndex === 1 ? 1 : -.45;
-    const finisher = player.comboIndex === 2 ? 1.28 : 1;
-    const anticipation = timing.anticipation;
-    const impact = timing.impact * finisher;
-    const follow = timing.followThrough;
-
-    addLocalRotation(bones.hips, anticipation * .025 - impact * .042 + follow * .02, side * (-anticipation * .038 + impact * .055), side * impact * .012, manager.scratch);
-    addLocalRotation(bones.spine, anticipation * .042 - impact * .078 + follow * .032, side * (-anticipation * .062 + impact * .09), side * (-anticipation * .018 + impact * .028), manager.scratch);
-    addLocalRotation(bones.chest, anticipation * .036 - impact * .096 + follow * .036, side * (-anticipation * .078 + impact * .112), side * (-anticipation * .024 + impact * .038), manager.scratch);
-    addLocalRotation(bones.head, -anticipation * .018 + impact * .035, side * (anticipation * .028 - impact * .04), -side * impact * .018, manager.scratch);
-
-    manager.contactAlignmentActive = timing.impact > .02;
-    manager.lastAttackContact = timing.contact;
-    manager.lastAttackImpact = timing.impact;
-  } else {
-    manager.contactAlignmentActive = false;
-    manager.lastAttackImpact = 0;
-    if (player.state === 'idle' && player.speed < .18) {
-      manager.idleClock += dt;
-      const breath = Math.sin(manager.idleClock * 2.05) * .0065;
-      const gaze = Math.sin(manager.idleClock * .73) * .005;
-      addLocalRotation(bones.chest, breath, gaze, 0, manager.scratch);
-      addLocalRotation(bones.head, -breath * .42, -gaze * .7, gaze * .25, manager.scratch);
-    }
-  }
-}
-
 function installEventAccents(game, manager, director) {
   const events = director?.events;
   if (!events) return;
@@ -182,41 +428,101 @@ function installEventAccents(game, manager, director) {
   manager.unsubscribers.push(events.on('attack:anticipation', event => {
     manager.lastAttackSerial = event.serial;
     manager.attackAnticipations++;
+    manager.peakComboImpact = 0;
   }));
 
   manager.unsubscribers.push(events.on('attack:strike', event => {
-    const accent = event.combo === 2 ? .28 : .13;
+    const accent = event.combo === 2 ? .34 : (event.combo === 1 ? .19 : .17);
     game.cameraKick = Math.max(game.cameraKick || 0, accent);
     manager.playerStrikeAccents++;
   }));
 
+  manager.unsubscribers.push(events.on('attack:follow-through', () => {
+    manager.followThroughEvents++;
+  }));
+
   manager.unsubscribers.push(events.on('sword:impact', event => {
     const bossHit = event.targets?.some(target => target.isBoss);
-    game.cameraKick = Math.max(game.cameraKick || 0, bossHit ? .58 : (event.combo === 2 ? .46 : .24));
+    game.cameraKick = Math.max(game.cameraKick || 0, bossHit ? .68 : (event.combo === 2 ? .54 : .30));
     manager.impactAccents += event.targets?.length || 1;
+  }));
+
+  manager.unsubscribers.push(events.on('locomotion:start', () => {
+    manager.pulses.start = 0;
+    manager.startEvents++;
+  }));
+  manager.unsubscribers.push(events.on('locomotion:stop', () => {
+    manager.pulses.stop = 0;
+    manager.stopEvents++;
+  }));
+  manager.unsubscribers.push(events.on('locomotion:direction-change', event => {
+    manager.pulses.pivot = 0;
+    manager.pulses.pivotSign = event.direction || 1;
+    manager.pivotEvents++;
+  }));
+  manager.unsubscribers.push(events.on('dodge:recover', () => {
+    manager.pulses.landing = 0;
+    manager.landingEvents++;
   }));
 }
 
 export function installAnimationNextLevel(game, director = game.rowanAnimationDirector) {
+  if (game.animationNextLevelManager?.version === 2) return game.animationNextLevelManager;
   patchEnemyPrototype();
 
   const manager = {
     ready: true,
-    mode: 'contact-aligned-layered-polish',
+    version: 2,
+    mode: 'authored-momentum-combat-v2',
     contactWindowsPreserved: true,
+    rootFallbackFlinchDisabled: true,
     playerStrikeAccents: 0,
     attackAnticipations: 0,
+    followThroughEvents: 0,
     impactAccents: 0,
+    startEvents: 0,
+    stopEvents: 0,
+    pivotEvents: 0,
+    landingEvents: 0,
     enemyFlinchEvents: 0,
     enemyFlinchFrames: 0,
     enemyVisualsReady: 0,
+    enemyTorsoRigsReady: 0,
+    bossVisualsReady: 0,
     velocitySyncedEnemies: 0,
     velocitySyncSamples: 0,
+    enemyStateTransitions: 0,
+    enemyWindups: 0,
+    enemyAttacks: 0,
+    enemyRecovers: 0,
+    enemyStatePoseFrames: 0,
+    enemyLocomotionPoseFrames: 0,
+    enemyDeathPoseFrames: 0,
+    bossPresentationFrames: 0,
+    motionFrames: 0,
+    locomotionImpulseFrames: 0,
+    comboPoseFrames: 0,
+    idleLifeFrames: 0,
     contactAlignmentActive: false,
     lastAttackContact: 0,
     lastAttackImpact: 0,
     lastAttackSerial: 0,
+    lastComboIndex: -1,
+    peakComboImpact: 0,
+    peakMotionEnergy: 0,
+    lastMotionPose: null,
     idleClock: 0,
+    playerRig: null,
+    playerRigCoverage: { core: 0, arms: 0, legs: 0 },
+    motion: {
+      previousSpeed: game.player.speed || 0,
+      previousFacing: game.player.facing || 0,
+      acceleration: 0,
+      lateralSpeed: 0,
+      turnRate: 0,
+      energy: 0,
+    },
+    pulses: { start: 99, stop: 99, pivot: 99, pivotSign: 1, landing: 99 },
     scratch: { quaternion: new Q(), euler: new E() },
     unsubscribers: [],
   };
@@ -235,7 +541,7 @@ export function installAnimationNextLevel(game, director = game.rowanAnimationDi
   const basePlayerUpdate = game.player.update.bind(game.player);
   game.player.update = (...args) => {
     const result = basePlayerUpdate(...args);
-    applyPlayerContactLayer(game, manager, args[0] || 0);
+    updatePlayerPresentation(game, manager, args[0] || 0);
     return result;
   };
 
