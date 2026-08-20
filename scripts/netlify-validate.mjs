@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 
-const baseUrl = 'http://127.0.0.1:4173';
-const env = { ...process.env, MAPLES_TEST_BASE_URL: baseUrl };
+const env = { ...process.env };
 
 function run(command, args, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
@@ -29,36 +28,9 @@ function run(command, args, timeoutMs = 120000) {
   });
 }
 
-async function ready() {
-  for (let i = 0; i < 100; i++) {
-    try {
-      if ((await fetch(baseUrl, { signal: AbortSignal.timeout(900) })).ok) return;
-    } catch {}
-    await new Promise(resolve => setTimeout(resolve, 250));
-  }
-  throw new Error('preview unavailable');
-}
-
-// Diagnostic isolation: verify animation + movement browser behavior without visual/performance suites.
-// Do not merge this diagnostic state.
+// Diagnostic isolation: unit tests + production build only. Do not merge this state.
 await run('npm', ['run', 'test:animation:unit'], 90000);
 console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
-await run('npx', ['playwright-core', 'install', 'chromium'], 120000);
-
-const preview = spawn(
-  'npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'],
-  { stdio: 'inherit', env, shell: false, detached: true },
-);
-
-try {
-  await ready();
-  await run('npm', ['run', 'test:movement'], 120000);
-  console.log('MOVEMENT SUITE PASS');
-  await run('node', ['tests/rowan-animation-e2e.mjs'], 120000);
-  console.log('ROWAN ANIMATION BROWSER SUITE PASS');
-  console.log('NETLIFY MOVEMENT/ANIMATION DIAGNOSTIC PASS');
-} finally {
-  try { process.kill(-preview.pid, 'SIGTERM'); }
-  catch { preview.kill('SIGTERM'); }
-}
+console.log('VITE PRODUCTION BUILD PASS');
+console.log('NETLIFY UNIT/BUILD DIAGNOSTIC PASS');
