@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 
-const env = { ...process.env };
+const baseUrl = 'http://127.0.0.1:4173';
+const env = { ...process.env, MAPLES_TEST_BASE_URL: baseUrl };
 
 function run(command, args, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
@@ -28,11 +29,35 @@ function run(command, args, timeoutMs = 120000) {
   });
 }
 
-// Diagnostic isolation: prove Chromium installation independently. Do not merge this state.
+async function ready() {
+  for (let i = 0; i < 100; i++) {
+    try {
+      if ((await fetch(baseUrl, { signal: AbortSignal.timeout(900) })).ok) return;
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  throw new Error('preview unavailable');
+}
+
+// Diagnostic isolation: movement browser suite with stable Chromium setup. Do not merge this state.
 await run('npm', ['run', 'test:animation:unit'], 90000);
 console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
 console.log('VITE PRODUCTION BUILD PASS');
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
 console.log('PLAYWRIGHT CHROMIUM INSTALL PASS');
-console.log('NETLIFY CHROMIUM DIAGNOSTIC PASS');
+
+const preview = spawn(
+  'npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'],
+  { stdio: 'inherit', env, shell: false, detached: true },
+);
+
+try {
+  await ready();
+  await run('npm', ['run', 'test:movement'], 300000);
+  console.log('MOVEMENT SUITE PASS');
+  console.log('NETLIFY MOVEMENT DIAGNOSTIC PASS');
+} finally {
+  try { process.kill(-preview.pid, 'SIGTERM'); }
+  catch { preview.kill('SIGTERM'); }
+}
