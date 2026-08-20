@@ -44,6 +44,21 @@ function freezeStaticDecorMatrices(game, stats) {
   return frozen;
 }
 
+function installScenePreRenderBridge(game, stats) {
+  const originalRender = game._render.bind(game);
+
+  // Three.js only executes Object3D.onBeforeRender for renderable objects, not
+  // Scene/Group nodes. PerformancePass and NatureInstancing compose their exact
+  // camera-culling work on the scene callback, so bridge that chain once from the
+  // game's real render entry point before the composer/renderer builds render lists.
+  game._render = (...args) => {
+    game.camera.updateWorldMatrix(true, false);
+    game.scene.onBeforeRender?.call(game.scene, game.renderer, game.scene, game.camera, null, null, null);
+    stats.preRenderFrames++;
+    return originalRender(...args);
+  };
+}
+
 function installRuntimeHotPaths(game, stats) {
   const projectileTarget = new THREE.Vector3();
   const damagePosition = new THREE.Vector3();
@@ -126,11 +141,13 @@ export function installPerformanceExtensions(game) {
     projectileFrames: 0,
     pickupFrames: 0,
     frozenStaticObjects: 0,
+    preRenderFrames: 0,
   };
 
   // Deliberately do not replace game._updateEnemies here. CinematicPolish and
   // AnimationPolish wrap that method to style asynchronously attached GLB enemies
   // and bosses. Preserving those wrappers is part of the zero-quality-loss contract.
+  installScenePreRenderBridge(game, stats);
   installRuntimeHotPaths(game, stats);
 
   const extension = {
