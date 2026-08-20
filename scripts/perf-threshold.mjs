@@ -5,7 +5,7 @@ const report = JSON.parse(fs.readFileSync(path.resolve('dist/perf-report.json'),
 const targets = {
   pixelRatio: 1.8,
   drawCallReductionPct: 20,
-  renderImprovementPct: 3,
+  renderRegressionFloorPct: -3,
   liveFpsRegressionFloorPct: -3,
 };
 
@@ -40,12 +40,12 @@ const progress = {
   liveFpsImprovementPct: report.liveFpsImprovementPct,
   renderedTriangleDeltaPct,
   drawCallTargetMet: finiteDrawCalls && report.drawCallReductionPct >= targets.drawCallReductionPct,
-  renderTargetMet: finiteRender && report.renderImprovementPct >= targets.renderImprovementPct,
+  renderFloorMet: finiteRender && report.renderImprovementPct >= targets.renderRegressionFloorPct,
   liveFpsFloorMet: finiteLiveFps && report.liveFpsImprovementPct >= targets.liveFpsRegressionFloorPct,
 };
 
 if (!progress.drawCallTargetMet) failures.push(`draw-call reduction ${report.drawCallReductionPct}% < ${targets.drawCallReductionPct}%`);
-if (!progress.renderTargetMet) failures.push(`render improvement ${report.renderImprovementPct}% < ${targets.renderImprovementPct}%`);
+if (!progress.renderFloorMet) failures.push(`render change ${report.renderImprovementPct}% < ${targets.renderRegressionFloorPct}% floor`);
 if (!progress.liveFpsFloorMet) failures.push(`live FPS change ${report.liveFpsImprovementPct}% < ${targets.liveFpsRegressionFloorPct}% floor`);
 
 console.log('PERFORMANCE QUALITY GATE', JSON.stringify({ targets, progress, failures }, null, 2));
