@@ -75,11 +75,13 @@ const result = await page.evaluate(() => {
     });
   }
 
+  // Match the existing proven Rowan locomotion regression: reach full speed,
+  // execute a committed direction change, then fully decelerate to idle.
   g.player.velocity.set(0, 0, 0);
   g.player.speed = 0;
-  for (let i = 0; i < 24; i++) g.player.update(dt, { x: 0, y: 1 }, g.cameraYaw);
-  for (let i = 0; i < 18; i++) g.player.update(dt, { x: 1, y: 0 }, g.cameraYaw);
-  for (let i = 0; i < 32; i++) g.player.update(dt, zero, g.cameraYaw);
+  for (let i = 0; i < 120; i++) g.player.update(dt, { x: 0, y: 1 }, g.cameraYaw);
+  for (let i = 0; i < 35; i++) g.player.update(dt, { x: 1, y: 0 }, g.cameraYaw);
+  for (let i = 0; i < 90; i++) g.player.update(dt, zero, g.cameraYaw);
 
   const dodgeVector = g.player.velocity.clone().set(1, 0, 0);
   const dodgeAccepted = g.player.beginDodge(dodgeVector);
@@ -119,6 +121,7 @@ const result = await page.evaluate(() => {
     peakMotionEnergy: manager.peakMotionEnergy,
     startEvents: manager.startEvents,
     stopEvents: manager.stopEvents,
+    pivotEvents: manager.pivotEvents,
     landingEvents: manager.landingEvents,
     locomotionImpulseFrames: manager.locomotionImpulseFrames,
     dodgeAccepted,
@@ -152,8 +155,8 @@ for (const check of result.comboChecks) {
   if (!check.returnedIdle) errors.push(`Combo ${check.combo} did not complete its real recovery lifecycle`);
 }
 if (result.playerStrikeAccents < 3 || result.attackAnticipations < 3 || result.followThroughEvents < 3) errors.push('All three player combo event phases did not execute');
-if (result.motionFrames < 20 || result.peakMotionEnergy < .1) errors.push(`Momentum-aware locomotion layer did not execute strongly enough: frames=${result.motionFrames}, energy=${result.peakMotionEnergy}`);
-if (result.startEvents < 1 || result.stopEvents < 1) errors.push(`Start/stop authored transition events missing: ${result.startEvents}/${result.stopEvents}`);
+if (result.motionFrames < 120 || result.peakMotionEnergy < .1) errors.push(`Momentum-aware locomotion layer did not execute strongly enough: frames=${result.motionFrames}, energy=${result.peakMotionEnergy}`);
+if (result.startEvents < 1 || result.stopEvents < 1 || result.pivotEvents < 1) errors.push(`Start/stop/pivot authored transition events missing: ${result.startEvents}/${result.stopEvents}/${result.pivotEvents}`);
 if (!result.dodgeAccepted || result.landingEvents < 1 || result.locomotionImpulseFrames < 1) errors.push('Dodge landing / locomotion impulse layer did not execute');
 if (result.velocitySyncedEnemies < 1 || result.velocitySyncSamples < 1) errors.push('Imported enemy locomotion did not enter velocity-synchronized playback');
 if (!(result.playbackScale >= .68 && result.playbackScale < 1)) errors.push(`Partial-speed enemy playback was not scaled below authored full speed: ${result.playbackScale}`);
