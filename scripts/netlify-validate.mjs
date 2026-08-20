@@ -39,8 +39,8 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Diagnostic isolation: verify all gameplay/visual browser suites without running
-// the expensive high-DPR performance benchmark. Do not merge this diagnostic state.
+// Diagnostic isolation: verify animation + movement browser behavior without visual/performance suites.
+// Do not merge this diagnostic state.
 await run('npm', ['run', 'test:animation:unit'], 90000);
 console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
@@ -57,9 +57,7 @@ try {
   console.log('MOVEMENT SUITE PASS');
   await run('node', ['tests/rowan-animation-e2e.mjs'], 120000);
   console.log('ROWAN ANIMATION BROWSER SUITE PASS');
-  await run('node', ['scripts/visual-netlify.mjs'], 180000);
-  console.log('VISUAL SUITE PASS');
-  console.log('NETLIFY GAMEPLAY/VISUAL DIAGNOSTIC PASS');
+  console.log('NETLIFY MOVEMENT/ANIMATION DIAGNOSTIC PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
