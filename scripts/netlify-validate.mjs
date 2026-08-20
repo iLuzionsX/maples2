@@ -15,16 +15,10 @@ function run(command, args, timeoutMs = 120000) {
       error ? reject(error) : resolve();
     };
     child.on('error', finish);
-    child.on('exit', code => code === 0
-      ? finish()
-      : finish(new Error(`${command} ${args.join(' ')} exited ${code}`)));
+    child.on('exit', code => code === 0 ? finish() : finish(new Error(`${command} ${args.join(' ')} exited ${code}`)));
     const timer = setTimeout(() => {
-      try { process.kill(-child.pid, 'SIGTERM'); }
-      catch { child.kill('SIGTERM'); }
-      setTimeout(() => {
-        try { process.kill(-child.pid, 'SIGKILL'); }
-        catch { child.kill('SIGKILL'); }
-      }, 2500).unref();
+      try { process.kill(-child.pid, 'SIGTERM'); } catch { child.kill('SIGTERM'); }
+      setTimeout(() => { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } }, 2500).unref();
       finish(new Error(`${command} ${args.join(' ')} timed out after ${timeoutMs}ms`));
     }, timeoutMs);
   });
@@ -32,33 +26,22 @@ function run(command, args, timeoutMs = 120000) {
 
 async function ready() {
   for (let i = 0; i < 100; i++) {
-    try {
-      if ((await fetch(baseUrl, { signal: AbortSignal.timeout(900) })).ok) return;
-    } catch {}
+    try { if ((await fetch(baseUrl, { signal: AbortSignal.timeout(900) })).ok) return; } catch {}
     await new Promise(resolve => setTimeout(resolve, 250));
   }
   throw new Error('preview unavailable');
 }
 
-// Temporary Rowan diagnostic: execute only the browser boot/rig assertions with
-// the FPS pass disabled. The source test itself remains unchanged in the repo.
-const source = fs.readFileSync('tests/rowan-animation-e2e.mjs', 'utf8')
-  .replace('`${baseUrl}/?quality=high&capture=1`', '`${baseUrl}/?perf=off&quality=high&capture=1`');
-const marker = 'const locomotion = await page.evaluate';
-const markerIndex = source.indexOf(marker);
-if (markerIndex < 0) throw new Error('Could not isolate Rowan boot section');
-const tempPath = 'tests/.rowan-boot-diagnostic.mjs';
-fs.writeFileSync(tempPath, `${source.slice(0, markerIndex)}\nawait context.close();\nawait browser.close();\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1); }\nconsole.log('ROWAN BOOT ISOLATION PASS');\n`);
+const tempPath = 'tests/.rowan-readiness-diagnostic.mjs';
+fs.writeFileSync(tempPath, `import { chromium } from 'playwright';\nconst baseUrl = process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';\nconst browser = await chromium.launch({ headless: true, args: ['--no-sandbox','--disable-setuid-sandbox','--use-gl=swiftshader','--enable-webgl','--ignore-gpu-blocklist'] });\nconst context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });\nconst page = await context.newPage();\nawait page.goto(\`${'${baseUrl}'}/?perf=off&quality=high&capture=1\`, { waitUntil: 'networkidle' });\nawait page.waitForFunction(() => { const g = window.__MAPLES_GAME__; return Boolean(g?.assetVisualManager?.heroReady && g?.enemies?.some(e => !e.dead && !e.isBoss && e.assetVisual) && document.querySelector('#enter-btn')?.dataset.ready === 'true'); }, null, { timeout: 60000 });\nawait page.locator('#enter-btn').click();\nawait page.waitForFunction(() => Boolean(window.__MAPLES_GAME__?.rowanAnimationDirector?.ready), null, { timeout: 60000 });\nconsole.log('ROWAN READINESS ISOLATION PASS');\nawait context.close();\nawait browser.close();\n`);
 
 await run('npm', ['run', 'build'], 90000);
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
 const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'inherit', env, shell: false, detached: true });
-
 try {
   await ready();
   await run('node', [tempPath], 180000);
 } finally {
-  try { process.kill(-preview.pid, 'SIGTERM'); }
-  catch { preview.kill('SIGTERM'); }
+  try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
   fs.rmSync(tempPath, { force: true });
 }
