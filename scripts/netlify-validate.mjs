@@ -39,8 +39,8 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Diagnostic run: preserve every behavior/visual suite and performance measurement,
-// but publish even when the final deterministic performance threshold is not met.
+// Diagnostic isolation: verify all gameplay/visual browser suites without running
+// the expensive high-DPR performance benchmark. Do not merge this diagnostic state.
 await run('npm', ['run', 'test:animation:unit'], 90000);
 console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
@@ -59,9 +59,7 @@ try {
   console.log('ROWAN ANIMATION BROWSER SUITE PASS');
   await run('node', ['scripts/visual-netlify.mjs'], 180000);
   console.log('VISUAL SUITE PASS');
-  await run('node', ['scripts/performance-observe.mjs'], 180000);
-  console.log('PERFORMANCE MEASUREMENT PUBLISHED FOR DIAGNOSIS');
-  console.log('NETLIFY DIAGNOSTIC FPS SHOWCASE VALIDATION PASS');
+  console.log('NETLIFY GAMEPLAY/VISUAL DIAGNOSTIC PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
