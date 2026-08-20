@@ -3,9 +3,14 @@ import {
   angleToTarget,
   selectMobileCombatTarget,
   shortestAngleDelta,
+  shouldEnableMobileControls,
 } from '../src/game/MobileCameraControls.js';
 
 const deg = value => value * Math.PI / 180;
+
+assert.equal(shouldEnableMobileControls({ coarse: true, touchPoints: 0, width: 1440 }), true, 'coarse pointers should use mobile controls');
+assert.equal(shouldEnableMobileControls({ coarse: false, touchPoints: 5, width: 390 }), true, 'narrow touch layouts should use mobile controls');
+assert.equal(shouldEnableMobileControls({ coarse: false, touchPoints: 5, width: 1440 }), false, 'wide fine-pointer touch laptops should preserve desktop controls');
 
 assert.ok(Math.abs(shortestAngleDelta(deg(179), deg(-179)) - deg(2)) < 1e-9, 'angle wrap should take the short +2° path');
 assert.ok(Math.abs(shortestAngleDelta(deg(-179), deg(179)) + deg(2)) < 1e-9, 'angle wrap should take the short -2° path');

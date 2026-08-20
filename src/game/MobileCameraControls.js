@@ -33,12 +33,16 @@ export function selectMobileCombatTarget(playerPosition, cameraYaw, enemies, { m
   return best;
 }
 
+export function shouldEnableMobileControls({ coarse, touchPoints, width }) {
+  return Boolean(coarse || (touchPoints > 0 && width <= 760));
+}
+
 export function installMobileCameraControls(game) {
   if (game.mobileCameraControls) return game.mobileCameraControls;
 
   const coarse = globalThis.matchMedia?.('(pointer: coarse)')?.matches ?? false;
-  const touchCapable = (globalThis.navigator?.maxTouchPoints || 0) > 0;
-  const enabled = coarse || touchCapable;
+  const touchPoints = globalThis.navigator?.maxTouchPoints || 0;
+  const enabled = shouldEnableMobileControls({ coarse, touchPoints, width: globalThis.innerWidth || 0 });
   const state = game.mobileCameraControls = {
     enabled,
     focusTarget: null,
