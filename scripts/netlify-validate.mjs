@@ -58,6 +58,8 @@ try {
   const results = [];
   results.push(await runCaptured('MOVEMENT SUITE', 'npm', ['run', 'test:movement']));
   results.push(await runCaptured('ROWAN ANIMATION BROWSER SUITE', 'node', ['tests/rowan-animation-e2e.mjs']));
+  const ghostResult = await runCaptured('GHOST VISIBILITY SUITE', 'node', ['tests/ghost-visibility-e2e.mjs']);
+  results.push(ghostResult);
   results.push(await runCaptured('VISUAL SUITE', 'node', ['scripts/visual-netlify.mjs']));
 
   const summary = results.map(result => `${result.label}: ${result.code === 0 ? 'PASS' : `FAIL (${result.code})`}`).join('\n');
@@ -69,7 +71,8 @@ try {
   ].join('\n');
   fs.writeFileSync('dist/validation-diagnostics.txt', diagnostics);
   console.log(summary);
-  console.log('DIAGNOSTIC PREVIEW PUBLISHED; strict validation will be restored before approval.');
+  if (ghostResult.code !== 0) throw new Error('Ghost visibility regression failed');
+  console.log('DIAGNOSTIC PREVIEW PUBLISHED; ghost visibility is a strict validation gate.');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
