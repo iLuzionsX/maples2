@@ -60,7 +60,7 @@ try {
   await run('node', ['scripts/performance-observe.mjs'], 180000);
   await run('node', ['scripts/perf-threshold.mjs'], 30000);
   console.log('FULL-QUALITY PERFORMANCE A/B PASS');
-  console.log('NETLIFY SHOWCASE VALIDATION PASS');
+  console.log('NETLIFY STRICT FPS SHOWCASE VALIDATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
