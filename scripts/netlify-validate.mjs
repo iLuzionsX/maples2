@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const baseUrl = 'http://127.0.0.1:4173';
@@ -39,7 +40,19 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Temporary binary isolation: Rowan browser suite only.
+// Temporary A/B isolation: run the unchanged Rowan browser assertions with only
+// the FPS pass disabled in the page URL. This diagnoses whether the failure is
+// caused by optimization runtime integration rather than changing test semantics.
+const sourcePath = 'tests/rowan-animation-e2e.mjs';
+const tempPath = 'tests/.rowan-animation-perf-off.mjs';
+const source = fs.readFileSync(sourcePath, 'utf8');
+const patched = source.replace(
+  '`${baseUrl}/?quality=high&capture=1`',
+  '`${baseUrl}/?perf=off&quality=high&capture=1`',
+);
+if (patched === source) throw new Error('Could not prepare Rowan perf-off diagnostic');
+fs.writeFileSync(tempPath, patched);
+
 await run('npm', ['run', 'build'], 90000);
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
 
@@ -50,9 +63,10 @@ const preview = spawn(
 
 try {
   await ready();
-  await run('node', ['tests/rowan-animation-e2e.mjs'], 180000);
-  console.log('ROWAN BROWSER ISOLATION PASS');
+  await run('node', [tempPath], 180000);
+  console.log('ROWAN PERF-OFF BROWSER ISOLATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
+  fs.rmSync(tempPath, { force: true });
 }
