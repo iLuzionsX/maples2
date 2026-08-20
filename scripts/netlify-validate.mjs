@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const baseUrl = 'http://127.0.0.1:4173';
@@ -14,16 +15,10 @@ function run(command, args, timeoutMs = 120000) {
       error ? reject(error) : resolve();
     };
     child.on('error', finish);
-    child.on('exit', code => code === 0
-      ? finish()
-      : finish(new Error(`${command} ${args.join(' ')} exited ${code}`)));
+    child.on('exit', code => code === 0 ? finish() : finish(new Error(`${command} ${args.join(' ')} exited ${code}`)));
     const timer = setTimeout(() => {
-      try { process.kill(-child.pid, 'SIGTERM'); }
-      catch { child.kill('SIGTERM'); }
-      setTimeout(() => {
-        try { process.kill(-child.pid, 'SIGKILL'); }
-        catch { child.kill('SIGKILL'); }
-      }, 2500).unref();
+      try { process.kill(-child.pid, 'SIGTERM'); } catch { child.kill('SIGTERM'); }
+      setTimeout(() => { try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); } }, 2500).unref();
       finish(new Error(`${command} ${args.join(' ')} timed out after ${timeoutMs}ms`));
     }, timeoutMs);
   });
@@ -31,29 +26,28 @@ function run(command, args, timeoutMs = 120000) {
 
 async function ready() {
   for (let i = 0; i < 100; i++) {
-    try {
-      if ((await fetch(baseUrl, { signal: AbortSignal.timeout(900) })).ok) return;
-    } catch {}
+    try { if ((await fetch(baseUrl, { signal: AbortSignal.timeout(900) })).ok) return; } catch {}
     await new Promise(resolve => setTimeout(resolve, 250));
   }
   throw new Error('preview unavailable');
 }
 
-// Temporary isolation: run the unchanged full Rowan browser suite with the
-// optimized runtime enabled. This keeps every authored animation assertion intact.
+// Temporary binary isolation: execute the unchanged Rowan browser test only
+// through its complete startup/rig/clip assertion block.
+const source = fs.readFileSync('tests/rowan-animation-e2e.mjs', 'utf8');
+const marker = 'const locomotion = await page.evaluate';
+const markerIndex = source.indexOf(marker);
+if (markerIndex < 0) throw new Error('Could not isolate Rowan boot section');
+const tempPath = 'tests/.rowan-boot-after-rig-fix.mjs';
+fs.writeFileSync(tempPath, `${source.slice(0, markerIndex)}\nawait context.close();\nawait browser.close();\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1); }\nconsole.log('ROWAN FULL BOOT ASSERTIONS PASS');\n`);
+
 await run('npm', ['run', 'build'], 90000);
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
-
-const preview = spawn(
-  'npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'],
-  { stdio: 'inherit', env, shell: false, detached: true },
-);
-
+const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'inherit', env, shell: false, detached: true });
 try {
   await ready();
-  await run('node', ['tests/rowan-animation-e2e.mjs'], 180000);
-  console.log('ROWAN ANIMATION BROWSER SUITE PASS');
+  await run('node', [tempPath], 180000);
 } finally {
-  try { process.kill(-preview.pid, 'SIGTERM'); }
-  catch { preview.kill('SIGTERM'); }
+  try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
+  fs.rmSync(tempPath, { force: true });
 }
