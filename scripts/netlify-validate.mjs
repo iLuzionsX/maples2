@@ -39,7 +39,7 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Strict handoff gate: all behavior, visual, and deterministic performance-quality checks must pass.
+// Strict final handoff gate: behavior, visual, and deterministic performance-quality checks must all pass.
 await run('npm', ['run', 'test:animation:unit'], 90000);
 console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
