@@ -40,31 +40,23 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Temporary A/B isolation: run the unchanged Rowan browser assertions with only
-// the FPS pass disabled in the page URL. This diagnoses whether the failure is
-// caused by optimization runtime integration rather than changing test semantics.
-const sourcePath = 'tests/rowan-animation-e2e.mjs';
-const tempPath = 'tests/.rowan-animation-perf-off.mjs';
-const source = fs.readFileSync(sourcePath, 'utf8');
-const patched = source.replace(
-  '`${baseUrl}/?quality=high&capture=1`',
-  '`${baseUrl}/?perf=off&quality=high&capture=1`',
-);
-if (patched === source) throw new Error('Could not prepare Rowan perf-off diagnostic');
-fs.writeFileSync(tempPath, patched);
+// Temporary Rowan diagnostic: execute only the browser boot/rig assertions with
+// the FPS pass disabled. The source test itself remains unchanged in the repo.
+const source = fs.readFileSync('tests/rowan-animation-e2e.mjs', 'utf8')
+  .replace('`${baseUrl}/?quality=high&capture=1`', '`${baseUrl}/?perf=off&quality=high&capture=1`');
+const marker = 'const locomotion = await page.evaluate';
+const markerIndex = source.indexOf(marker);
+if (markerIndex < 0) throw new Error('Could not isolate Rowan boot section');
+const tempPath = 'tests/.rowan-boot-diagnostic.mjs';
+fs.writeFileSync(tempPath, `${source.slice(0, markerIndex)}\nawait context.close();\nawait browser.close();\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1); }\nconsole.log('ROWAN BOOT ISOLATION PASS');\n`);
 
 await run('npm', ['run', 'build'], 90000);
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
-
-const preview = spawn(
-  'npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'],
-  { stdio: 'inherit', env, shell: false, detached: true },
-);
+const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'inherit', env, shell: false, detached: true });
 
 try {
   await ready();
   await run('node', [tempPath], 180000);
-  console.log('ROWAN PERF-OFF BROWSER ISOLATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
