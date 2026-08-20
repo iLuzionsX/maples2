@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 
-const baseUrl = 'http://127.0.0.1:4173';
-const env = { ...process.env, MAPLES_TEST_BASE_URL: baseUrl };
+const env = { ...process.env };
 
 function run(command, args, timeoutMs = 120000) {
   return new Promise((resolve, reject) => {
@@ -20,39 +19,11 @@ function run(command, args, timeoutMs = 120000) {
     const timer = setTimeout(() => {
       try { process.kill(-child.pid, 'SIGTERM'); }
       catch { child.kill('SIGTERM'); }
-      setTimeout(() => {
-        try { process.kill(-child.pid, 'SIGKILL'); }
-        catch { child.kill('SIGKILL'); }
-      }, 2500).unref();
       finish(new Error(`${command} ${args.join(' ')} timed out after ${timeoutMs}ms`));
     }, timeoutMs);
   });
 }
 
-async function ready() {
-  for (let i = 0; i < 100; i++) {
-    try {
-      if ((await fetch(baseUrl, { signal: AbortSignal.timeout(900) })).ok) return;
-    } catch {}
-    await new Promise(resolve => setTimeout(resolve, 250));
-  }
-  throw new Error('preview unavailable');
-}
-
-// Temporary binary isolation: movement suite only.
-await run('npm', ['run', 'build'], 90000);
-await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
-
-const preview = spawn(
-  'npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'],
-  { stdio: 'inherit', env, shell: false, detached: true },
-);
-
-try {
-  await ready();
-  await run('npm', ['run', 'test:movement'], 300000);
-  console.log('MOVEMENT ISOLATION PASS');
-} finally {
-  try { process.kill(-preview.pid, 'SIGTERM'); }
-  catch { preview.kill('SIGTERM'); }
-}
+// Temporary binary isolation: Rowan unit suite only.
+await run('npm', ['run', 'test:animation:unit'], 90000);
+console.log('ROWAN UNIT ISOLATION PASS');
