@@ -33,6 +33,7 @@ installAnimationPolish(game);
 const rowanAnimationDirector = installRowanAnimationDirector(game);
 installFrameInvariantRowanTransitions(game, rowanAnimationDirector);
 installShowcaseQualityGate(game);
+// Zero-quality-loss FPS pass remains opt-out only for deterministic A/B validation.
 const performanceDisabled = new URLSearchParams(location.search).get('perf') === 'off';
 const performancePass = performanceDisabled ? null : installPerformancePass(game);
 const environmentPromise = installEnvironmentAssets(game);
