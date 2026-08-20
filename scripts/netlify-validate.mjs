@@ -39,6 +39,7 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
+// Strict handoff gate: every suite below must pass; no diagnostic soft-fail remains.
 await run('npm', ['run', 'test:animation:unit'], 90000);
 console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
