@@ -58,18 +58,26 @@ function loadGLTF(url) {
   return cache.get(url);
 }
 
-function configureMeshTree(root, tint = null, tintAmount = 0) {
+function configureMeshTree(root, tint = null, tintAmount = 0, repairConvertedAlpha = false) {
   root.traverse(node => {
     if (!node.isMesh && !node.isSkinnedMesh) return;
     node.castShadow = true;
     node.receiveShadow = true;
-    node.frustumCulled = true;
+    // Animated skinned bounds do not follow every posed vertex, so culling them can make a valid monster disappear.
+    node.frustumCulled = !node.isSkinnedMesh;
     if (node.material) {
       const materials = Array.isArray(node.material) ? node.material : [node.material];
       const copies = materials.map(material => {
         const copy = material.clone();
         if (copy.color && tint != null && tintAmount > 0) copy.color.lerp(new THREE.Color(tint), tintAmount);
         if ('roughness' in copy) copy.roughness = Math.max(.48, copy.roughness ?? .7);
+        // Some Quaternius FBX -> GLB conversions arrive with zeroed alpha. Monsters are authored opaque.
+        if (repairConvertedAlpha) {
+          copy.opacity = 1;
+          copy.transparent = false;
+          copy.depthWrite = true;
+          copy.needsUpdate = true;
+        }
         return copy;
       });
       node.material = Array.isArray(node.material) ? copies : copies[0];
@@ -258,7 +266,7 @@ async function attachEnemy(enemy, kind) {
     const settings = monsterSettings(actualKind, enemy.isBoss);
     model.name = `${actualKind}_Imported_Visual`;
     model.userData.assetVisual = true;
-    configureMeshTree(model, settings.tint, settings.tintAmount);
+    configureMeshTree(model, settings.tint, settings.tintAmount, true);
     normalizeToHeight(model, settings.height, settings.lift);
     model.rotation.y = settings.rotation;
     enemy.root.add(model);
