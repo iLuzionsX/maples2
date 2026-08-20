@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 
+// Final handoff path: preserve full rendered quality while reducing redundant renderer/CPU work.
 const EMPTY = Object.freeze([]);
 const _inverseDecor = new THREE.Matrix4();
 const _batchProjection = new THREE.Matrix4();
