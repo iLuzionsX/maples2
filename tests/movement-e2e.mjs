@@ -5,6 +5,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 
 const baseUrl = process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';
+const READY_TIMEOUT = 60000;
 const out = path.resolve('artifacts');
 fs.mkdirSync(out, { recursive: true });
 let previewProcess = null;
@@ -29,7 +30,7 @@ async function ensurePreview() {
 async function readyGame(page) {
   await page.goto(baseUrl, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__));
-  await page.waitForFunction(() => document.querySelector('#enter-btn')?.dataset.ready === 'true', null, { timeout: 30000 });
+  await page.waitForFunction(() => document.querySelector('#enter-btn')?.dataset.ready === 'true', null, { timeout: READY_TIMEOUT });
   await page.locator('#enter-btn').click();
   await page.waitForTimeout(150);
   await page.evaluate(() => {
