@@ -39,7 +39,7 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Diagnostic isolation: movement browser suite with stable Chromium setup. Do not merge this state.
+// Strict handoff gate: all behavior, visual, and deterministic performance-quality checks must pass.
 await run('npm', ['run', 'test:animation:unit'], 90000);
 console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
@@ -56,7 +56,14 @@ try {
   await ready();
   await run('npm', ['run', 'test:movement'], 300000);
   console.log('MOVEMENT SUITE PASS');
-  console.log('NETLIFY MOVEMENT DIAGNOSTIC PASS');
+  await run('node', ['tests/rowan-animation-e2e.mjs'], 180000);
+  console.log('ROWAN ANIMATION BROWSER SUITE PASS');
+  await run('node', ['scripts/visual-netlify.mjs'], 240000);
+  console.log('VISUAL SUITE PASS');
+  await run('node', ['scripts/performance-observe.mjs'], 300000);
+  await run('node', ['scripts/perf-threshold.mjs'], 30000);
+  console.log('FULL-QUALITY PERFORMANCE A/B PASS');
+  console.log('NETLIFY STRICT FPS SHOWCASE VALIDATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
