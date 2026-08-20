@@ -39,8 +39,7 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Temporary binary isolation: movement/Rowan half only.
-await run('npm', ['run', 'test:animation:unit'], 90000);
+// Temporary binary isolation: movement suite only.
 await run('npm', ['run', 'build'], 90000);
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
 
@@ -52,10 +51,7 @@ const preview = spawn(
 try {
   await ready();
   await run('npm', ['run', 'test:movement'], 300000);
-  console.log('MOVEMENT SUITE PASS');
-  await run('node', ['tests/rowan-animation-e2e.mjs'], 180000);
-  console.log('ROWAN ANIMATION BROWSER SUITE PASS');
-  console.log('MOVEMENT/ROWAN ISOLATION PASS');
+  console.log('MOVEMENT ISOLATION PASS');
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); }
   catch { preview.kill('SIGTERM'); }
