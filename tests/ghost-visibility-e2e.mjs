@@ -8,7 +8,8 @@ const browser = await chromium.launch({
 });
 
 try {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
   await page.goto(`${baseUrl}/?quality=high&capture=1`, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => {
     const g = window.__MAPLES_GAME__;
