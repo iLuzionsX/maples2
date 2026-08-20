@@ -58,6 +58,8 @@ try {
   console.log('MOVEMENT SUITE PASS');
   await run('node', ['tests/rowan-animation-e2e.mjs'], 180000);
   console.log('ROWAN ANIMATION BROWSER SUITE PASS');
+  await run('node', ['tests/ghost-visibility-e2e.mjs'], 180000);
+  console.log('GHOST VISIBILITY SUITE PASS');
   await run('node', ['scripts/visual-netlify.mjs'], 240000);
   console.log('VISUAL SUITE PASS');
   await run('node', ['scripts/performance-observe.mjs'], 300000);
