@@ -28,9 +28,11 @@ function run(command, args, timeoutMs = 120000) {
   });
 }
 
-// Diagnostic isolation: unit tests + production build only. Do not merge this state.
+// Diagnostic isolation: prove Chromium installation independently. Do not merge this state.
 await run('npm', ['run', 'test:animation:unit'], 90000);
 console.log('ROWAN ANIMATION UNIT SUITE PASS');
 await run('npm', ['run', 'build'], 90000);
 console.log('VITE PRODUCTION BUILD PASS');
-console.log('NETLIFY UNIT/BUILD DIAGNOSTIC PASS');
+await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
+console.log('PLAYWRIGHT CHROMIUM INSTALL PASS');
+console.log('NETLIFY CHROMIUM DIAGNOSTIC PASS');
