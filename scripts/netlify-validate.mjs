@@ -4,10 +4,10 @@ import { spawn } from 'node:child_process';
 const baseUrl = 'http://127.0.0.1:4173';
 const env = { ...process.env, MAPLES_TEST_BASE_URL: baseUrl };
 
-function run(command, args, timeoutMs = 120000) {
+function run(command, args, timeoutMs = 120000, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     let settled = false;
-    const child = spawn(command, args, { stdio: 'inherit', env, shell: false, detached: true });
+    const child = spawn(command, args, { stdio: 'inherit', env: { ...env, ...extraEnv }, shell: false, detached: true });
     const finish = error => {
       if (settled) return;
       settled = true;
@@ -32,21 +32,28 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Temporary binary isolation: execute the unchanged Rowan browser test through
-// all boot + deterministic locomotion assertions, stopping before combat.
 const source = fs.readFileSync('tests/rowan-animation-e2e.mjs', 'utf8');
 const marker = 'const combat = await page.evaluate';
 const markerIndex = source.indexOf(marker);
 if (markerIndex < 0) throw new Error('Could not isolate Rowan locomotion section');
-const tempPath = 'tests/.rowan-locomotion-after-rig-fix.mjs';
+const tempPath = 'tests/.rowan-locomotion-loot-validation.mjs';
 fs.writeFileSync(tempPath, `${source.slice(0, markerIndex)}\nawait context.close();\nawait browser.close();\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1); }\nconsole.log('ROWAN LOCOMOTION ASSERTIONS PASS');\n`);
 
+console.log('VALIDATE: loot unit');
+await run('npm', ['run', 'test:loot'], 90000);
+console.log('VALIDATE: vite build');
 await run('npm', ['run', 'build'], 90000);
+console.log('VALIDATE: chromium install');
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
 const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'inherit', env, shell: false, detached: true });
 try {
   await ready();
+  console.log('VALIDATE: Rowan locomotion');
   await run('node', [tempPath], 180000);
+  console.log('VALIDATE: loot desktop interaction');
+  await run('node', ['tests/loot-system-e2e.mjs'], 180000, { MAPLES_LOOT_E2E_MODE: 'desktop' });
+  console.log('VALIDATE: loot mobile interaction');
+  await run('node', ['tests/loot-system-e2e.mjs'], 180000, { MAPLES_LOOT_E2E_MODE: 'mobile' });
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
   fs.rmSync(tempPath, { force: true });

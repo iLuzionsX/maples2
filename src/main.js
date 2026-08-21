@@ -3,6 +3,7 @@ import './asset-polish.css';
 import './showcase.css';
 import './narrow-hud-fix.css';
 import './premium-ui.css';
+import './loot.css';
 import { Game } from './game/Game.js';
 import { enhanceInstance } from './game/Enhancements.js';
 import { installAssetVisuals } from './game/AssetVisuals.js';
@@ -20,6 +21,7 @@ import { installPerformancePass } from './game/PerformancePass.js';
 import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
+import { installLootSystem } from './game/LootSystem.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -43,6 +45,8 @@ const performanceDisabled = new URLSearchParams(location.search).get('perf') ===
 const performancePass = performanceDisabled ? null : installPerformancePass(game);
 const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
 installMobileCameraControls(game);
+// Loot must wrap the final pickup hot path so performance optimizations cannot bypass field-drop magnet/collection updates.
+installLootSystem(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
