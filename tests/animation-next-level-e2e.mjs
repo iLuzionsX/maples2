@@ -18,13 +18,13 @@ await page.waitForFunction(() => {
   const g = window.__MAPLES_GAME__;
   return Boolean(
     g?.assetVisualManager?.heroReady &&
-    g?.rowanAnimationDirector?.ready &&
     g?.animationNextLevelManager?.ready &&
     g?.enemies?.some(enemy => enemy.assetVisual && !enemy.dead) &&
     document.querySelector('#enter-btn')?.dataset.ready === 'true'
   );
 }, null, { timeout: 60000 });
 await page.locator('#enter-btn').click();
+await page.waitForFunction(() => Boolean(window.__MAPLES_GAME__?.rowanAnimationDirector?.ready), null, { timeout: 60000 });
 
 const result = await page.evaluate(() => {
   const g = window.__MAPLES_GAME__;
@@ -60,7 +60,6 @@ const result = await page.evaluate(() => {
       g.player.update(dt, zero, g.cameraYaw);
       recoveryFrames++;
     }
-    // Give every downstream animation layer a clean idle sample before the next combo.
     g.player.update(dt, zero, g.cameraYaw);
 
     comboChecks.push({
@@ -75,10 +74,13 @@ const result = await page.evaluate(() => {
     });
   }
 
-  // Match the existing proven Rowan locomotion regression: reach full speed,
-  // execute a committed direction change, then fully decelerate to idle.
+  g.player.state = 'idle';
+  g.player.stateTime = 0;
   g.player.velocity.set(0, 0, 0);
   g.player.speed = 0;
+  g.cameraYaw = Math.PI;
+  g.player.facing = Math.PI;
+  g.player.root.rotation.y = Math.PI;
   for (let i = 0; i < 120; i++) g.player.update(dt, { x: 0, y: 1 }, g.cameraYaw);
   for (let i = 0; i < 35; i++) g.player.update(dt, { x: 1, y: 0 }, g.cameraYaw);
   for (let i = 0; i < 90; i++) g.player.update(dt, zero, g.cameraYaw);
