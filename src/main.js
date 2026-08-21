@@ -2,6 +2,7 @@ import './style.css';
 import './asset-polish.css';
 import './showcase.css';
 import './narrow-hud-fix.css';
+import './premium-ui.css';
 import { Game } from './game/Game.js';
 import { enhanceInstance } from './game/Enhancements.js';
 import { installAssetVisuals } from './game/AssetVisuals.js';
