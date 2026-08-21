@@ -32,8 +32,8 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Temporary binary isolation: execute the unchanged Rowan browser test through
-// all boot + deterministic locomotion assertions, stopping before combat.
+// Execute the established Rowan browser test through boot + deterministic
+// locomotion assertions, stopping before its larger combat/death section.
 const source = fs.readFileSync('tests/rowan-animation-e2e.mjs', 'utf8');
 const marker = 'const combat = await page.evaluate';
 const markerIndex = source.indexOf(marker);
@@ -48,8 +48,7 @@ const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--
 try {
   await ready();
   await run('node', [tempPath], 180000);
-  // Isolation run: the substantial browser suite is temporarily omitted only
-  // to prove whether the red check originates before or inside that suite.
+  await run('node', ['tests/animation-next-level-e2e.mjs'], 180000);
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
   fs.rmSync(tempPath, { force: true });
