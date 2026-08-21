@@ -18,6 +18,7 @@ import { installShowcaseQualityGate } from './game/ShowcaseQualityGate.js';
 import { installPerformancePass } from './game/PerformancePass.js';
 import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
+import { installMobileCameraControls } from './game/MobileCameraControls.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -40,6 +41,7 @@ installShowcaseQualityGate(game);
 const performanceDisabled = new URLSearchParams(location.search).get('perf') === 'off';
 const performancePass = performanceDisabled ? null : installPerformancePass(game);
 const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
+installMobileCameraControls(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
