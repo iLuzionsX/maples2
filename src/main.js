@@ -3,6 +3,7 @@ import './asset-polish.css';
 import './showcase.css';
 import './narrow-hud-fix.css';
 import './premium-ui.css';
+import './town.css';
 import { Game } from './game/Game.js';
 import { enhanceInstance } from './game/Enhancements.js';
 import { installAssetVisuals } from './game/AssetVisuals.js';
@@ -21,6 +22,12 @@ import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
 import { installCameraPitchControls } from './game/CameraPitchControls.js';
+import { installLumenwoodTown } from './game/TownSystem.js';
+import { clearLumenwoodFootprint } from './game/TownFootprint.js';
+import { installTownRuntimeGuards } from './game/TownRuntime.js';
+import { installTownPresentation } from './game/TownPresentation.js';
+import { hideLegacyFlatTownSurfaces } from './game/TownSurfaceCleanup.js';
+import { installTownExpansionCollisions } from './game/TownExpansionCollision.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -45,6 +52,7 @@ const performancePass = performanceDisabled ? null : installPerformancePass(game
 const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
 installMobileCameraControls(game);
 installCameraPitchControls(game);
+let town = null;
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
@@ -63,12 +71,18 @@ function waitForCoreVisuals(timeoutMs = 15000) {
 }
 
 Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(async () => {
+  clearLumenwoodFootprint(game);
+  town = installTownRuntimeGuards(installLumenwoodTown(game));
+  hideLegacyFlatTownSurfaces(town);
+  installTownPresentation(town);
+  installTownExpansionCollisions(town);
+  window.__MAPLES_TOWN__ = town;
   if (performancePass) {
     performancePass.rebatch();
     performanceExtensions?.freezeStaticDecor();
     await installNatureInstancing(game);
   }
-  enterButton.textContent = 'Enter the Glade';
+  enterButton.textContent = 'Enter Lumenwood';
   enterButton.disabled = false;
   enterButton.dataset.ready = 'true';
 });
