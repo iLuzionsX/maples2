@@ -29,7 +29,7 @@ const boot = await page.evaluate(() => {
     dynamicName:town.dynamic.name,
     arenaRadius:game.world.arenaRadius,
     starterCoins:town.coins,
-    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions&&town.__authoredWorldBounds&&town.__modalHostileSafety&&town.__nous0xUi),
+    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions&&town.__authoredWorldBounds&&town.__modalHostileSafety&&town.__modalCombatPause&&town.__nous0xUi),
     settingsVisible:Boolean(document.querySelector('#town-settings-btn')),
     interactVisible:Boolean(document.querySelector('#town-interact')),
     providerTitle:document.querySelector('#town-settings header h2')?.textContent,
@@ -114,17 +114,36 @@ const safety = await page.evaluate(() => {
   const shopModal=town.modalOpen;
   game.enemies.pop();
 
+  // A modal that opened safely must remain safe for its whole lifetime. Hostile
+  // updates pause while it owns input, and an externally moved threat closes it.
   player.setPosition(0,0,18);
+  const lifetimeHostile={dead:false,remove:false,isBoss:false,attackRange:1.45,position:{x:4,z:9},update(){this.updateCalls=(this.updateCalls||0)+1;}};
+  game.enemies.push(lifetimeHostile);
   const allowed=town.openSettings();
-  return {blocked,blockedModal,wardEdgeBlocked,wardEdgeModal,dialogueBlocked,dialogueModal,shopBlocked,shopModal,allowed,allowedModal:town.modalOpen};
+  const allowedModal=town.modalOpen;
+  game._updateEnemies(.016,.016);
+  const enemyUpdatesWhileModal=lifetimeHostile.updateCalls||0;
+  lifetimeHostile.position.x=0;
+  lifetimeHostile.position.z=16;
+  town.update(0);
+  const closedOnNewThreat=!town.modalOpen;
+  game.enemies.pop();
+  const reopened=town.openSettings();
+
+  return {
+    blocked,blockedModal,wardEdgeBlocked,wardEdgeModal,dialogueBlocked,dialogueModal,shopBlocked,shopModal,
+    allowed,allowedModal,enemyUpdatesWhileModal,closedOnNewThreat,reopened,reopenedModal:town.modalOpen
+  };
 });
 if(
   safety.blocked!==false||safety.blockedModal||
   safety.wardEdgeBlocked!==false||safety.wardEdgeModal||
   safety.dialogueBlocked!==false||safety.dialogueModal||
   safety.shopBlocked!==false||safety.shopModal||
-  safety.allowed!==true||!safety.allowedModal
-) errors.push(`safe modal gate failed: ${JSON.stringify(safety)}`);
+  safety.allowed!==true||!safety.allowedModal||
+  safety.enemyUpdatesWhileModal!==0||!safety.closedOnNewThreat||
+  safety.reopened!==true||!safety.reopenedModal
+) errors.push(`safe modal lifetime gate failed: ${JSON.stringify(safety)}`);
 
 await page.fill('#town-ai-key','sk-nous-test-session-only-1234567890');
 await page.check('#town-ai-enabled');
@@ -170,5 +189,5 @@ await mobile.close();
 await browser.close();
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1);}
-console.log('town-runtime: desktop + mobile + Nous 0x Alpha settings PASS');
+console.log('town-runtime: desktop + mobile + Nous 0x Alpha settings + modal lifetime safety PASS');
 console.log(JSON.stringify({boot,collision,dialogue,before,after,safety,settings,mobileLayout},null,2));
