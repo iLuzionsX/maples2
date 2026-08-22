@@ -45,7 +45,7 @@ const result = await page.evaluate(() => {
   const bridgeCenter={x:player.position.x,z:player.position.z};
 
   return {
-    ready:Boolean(state?.ready&&town.__mosswakeBridge&&town.__largerWorldApproach&&town.__authoredLargerWorldBounds),
+    ready:Boolean(state?.ready&&state?.deckGroundAligned&&town.__mosswakeBridge&&town.__largerWorldApproach&&town.__authoredLargerWorldBounds),
     deck:state?.deck?.length||0,
     storyScenery:state?.storyScenery?.length||0,
     nature:state?.nature?.length||0,
@@ -69,7 +69,7 @@ if(result.deck<13||result.storyScenery<6||result.nature<16) errors.push(`bridge/
 if(result.storyMarker!=='MosswakeBridgeStoryMarker'||result.waterName!=='BlackbriarRunWater'||result.blockers!==2) errors.push(`bridge environmental story layer incomplete: ${JSON.stringify(result)}`);
 if(!result.bounds||result.bounds.southMinZ>-62||result.bounds.northMaxZ<68||result.bounds.northTrailHalfWidth<18) errors.push(`larger world bounds incomplete: ${JSON.stringify(result.bounds)}`);
 if(!result.presentationBounds||result.presentationBounds.southMinZ>-62||result.presentationBounds.northMaxZ<68) errors.push(`presentation did not inherit larger bounds: ${JSON.stringify(result.presentationBounds)}`);
-if(result.arenaRadius<68) errors.push(`arena metadata did not expand: ${result.arenaRadius}`);
+if(result.arenaRadius<34||result.arenaRadius>40) errors.push(`combat arena radius changed unexpectedly: ${result.arenaRadius}`);
 if(Math.hypot(result.glade.x,result.glade.z)>34.001) errors.push(`combat glade boundary regressed: ${JSON.stringify(result.glade)}`);
 if(result.south.x>26.001||result.south.z<-62.001) errors.push(`southern approach boundary failed: ${JSON.stringify(result.south)}`);
 if(Math.abs(result.northTrail.x)>.001||result.northTrail.z>68.001) errors.push(`northern road extension failed: ${JSON.stringify(result.northTrail)}`);
