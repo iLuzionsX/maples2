@@ -209,6 +209,8 @@ async function runJob(job, rootDir, apiKey) {
       body: JSON.stringify({
         model,
         messages,
+        reasoning_effort: 'low',
+        include_reasoning: false,
         max_tokens: job.maxTokens,
         stream: true,
         tags: ['product=maples', 'workflow=code-delegation']
