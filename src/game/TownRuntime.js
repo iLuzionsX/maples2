@@ -95,6 +95,11 @@ function hostileCanThreatenModal(town) {
   return false;
 }
 
+function canOpenBlockingTownModal(town) {
+  if (!town.game.started) return true;
+  return isTownSafeZone(town.game.player.position) && !hostileCanThreatenModal(town);
+}
+
 function installNous0xUi(town) {
   const panel = town.ui?.settings;
   if (!panel) return;
@@ -158,17 +163,33 @@ export function installTownRuntimeGuards(town) {
     }
   } catch {}
 
-  // Blocking settings are available on the title screen and in Lumenwood only
-  // when Rowan is beyond every live hostile's immediate attack/lunge envelope.
-  // This prevents a ward-edge enemy from damaging an undefendable player while
-  // the modal has intentionally cleared movement and combat input.
+  // Every input-blocking town modal uses the same safety gate. This covers
+  // Settings, NPC dialogue, and shop panels so Rowan can never lose controls
+  // while a ward-edge hostile remains inside its attack/lunge envelope.
+  const rejectUnsafeModal = function rejectUnsafeTownModal() {
+    if (canOpenBlockingTownModal(this)) return false;
+    this.game.toast?.('Move deeper into Lumenwood before stopping to interact.', 1.4);
+    return true;
+  };
+
   const openSettings = town.openSettings.bind(town);
   town.openSettings = function openTownSettingsSafely() {
-    if (this.game.started && (!isTownSafeZone(this.game.player.position) || hostileCanThreatenModal(this))) {
-      this.game.toast?.('Move deeper into Lumenwood to change settings.', 1.4);
-      return false;
-    }
+    if (rejectUnsafeModal.call(this)) return false;
     openSettings();
+    return true;
+  };
+
+  const openDialogue = town.openDialogue.bind(town);
+  town.openDialogue = function openTownDialogueSafely(npc) {
+    if (rejectUnsafeModal.call(this)) return false;
+    openDialogue(npc);
+    return true;
+  };
+
+  const openShop = town.openShop.bind(town);
+  town.openShop = function openTownShopSafely(shopId) {
+    if (rejectUnsafeModal.call(this)) return false;
+    openShop(shopId);
     return true;
   };
 
