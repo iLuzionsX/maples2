@@ -10,7 +10,7 @@ const browser = await chromium.launch({
 async function collect(page, label) {
   page.on('pageerror', error => errors.push(`${label} pageerror: ${error.message}`));
   page.on('console', message => {
-    if (message.type() === 'error' && !message.text().includes('favicon')) errors.push(`${label} console: ${message.text()}`);
+    if (message.type() === 'error' && !message.text().includes('favicon')) errors.push(`${label} console: ${message.text()}`));
   });
 }
 
@@ -29,9 +29,11 @@ const boot = await page.evaluate(() => {
     dynamicName:town.dynamic.name,
     arenaRadius:game.world.arenaRadius,
     starterCoins:town.coins,
-    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions&&town.__authoredWorldBounds&&town.__modalHostileSafety),
+    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions&&town.__authoredWorldBounds&&town.__modalHostileSafety&&town.__nous0xUi),
     settingsVisible:Boolean(document.querySelector('#town-settings-btn')),
     interactVisible:Boolean(document.querySelector('#town-interact')),
+    providerTitle:document.querySelector('#town-settings header h2')?.textContent,
+    defaultModel:document.querySelector('#town-ai-model')?.value,
     townObjects:town.root.children.length
   };
 });
@@ -40,6 +42,7 @@ if(boot.rootName!=='LumenwoodCrossing'||boot.dynamicName!=='LumenwoodLife') erro
 if(boot.arenaRadius<36) errors.push(`town arena was not expanded: ${boot.arenaRadius}`);
 if(boot.starterCoins!==75) errors.push(`first-run wallet expected 75 coins, got ${boot.starterCoins}`);
 if(!boot.runtimeGuards) errors.push('town runtime guards did not install');
+if(boot.providerTitle!=='0x Alpha'||boot.defaultModel!=='auto:0x-alpha') errors.push(`Nous 0x Alpha settings did not initialize: ${JSON.stringify(boot)}`);
 if(!boot.settingsVisible||!boot.interactVisible||boot.townObjects<20) errors.push('town UI/environment did not install completely');
 
 await page.locator('#enter-btn').click();
@@ -113,19 +116,21 @@ const safety = await page.evaluate(() => {
 });
 if(safety.blocked!==false||safety.blockedModal||safety.wardEdgeBlocked!==false||safety.wardEdgeModal||safety.allowed!==true||!safety.allowedModal) errors.push(`safe settings gate failed: ${JSON.stringify(safety)}`);
 
-await page.fill('#town-ai-key','sk-test-session-only-1234567890');
-await page.fill('#town-ai-model','gpt-5.6');
+await page.fill('#town-ai-key','sk-nous-test-session-only-1234567890');
 await page.check('#town-ai-enabled');
 await page.click('#town-ai-save');
 const settings = await page.evaluate(() => ({
   enabled:window.__MAPLES_TOWN__.ai.settings.enabled,
   model:window.__MAPLES_TOWN__.ai.settings.model,
+  label:window.__MAPLES_TOWN__.ai.modelLabel,
   sessionKey:sessionStorage.getItem('maples.ai.key.v1'),
   persistent:localStorage.getItem('maples.ai.settings.v1'),
-  localKeyLeak:localStorage.getItem('maples.ai.key.v1')
+  localKeyLeak:localStorage.getItem('maples.ai.key.v1'),
+  keyLabel:document.querySelector('#town-settings .town-field span')?.textContent
 }));
-if(!settings.enabled||settings.model!=='gpt-5.6'||!settings.sessionKey?.startsWith('sk-test-')||settings.localKeyLeak) errors.push('session-scoped AI settings failed');
-if((settings.persistent||'').includes('sk-test-')) errors.push('API key leaked into persistent settings');
+if(!settings.enabled||settings.model!=='auto:0x-alpha'||settings.label!=='0x Alpha · auto'||!settings.sessionKey?.startsWith('sk-nous-test-')||settings.localKeyLeak) errors.push(`session-scoped Nous settings failed: ${JSON.stringify(settings)}`);
+if(settings.keyLabel!=='Nous Portal API key') errors.push(`Nous settings label missing: ${settings.keyLabel}`);
+if((settings.persistent||'').includes('sk-nous-test-')) errors.push('API key leaked into persistent settings');
 await page.click('#town-ai-clear');
 await page.click('[data-settings-close]');
 
@@ -147,13 +152,13 @@ const mobileLayout=await mp.evaluate(() => {
   const panel=document.querySelector('#town-settings').getBoundingClientRect();
   const button=document.querySelector('#town-settings-btn').getBoundingClientRect();
   const controls=getComputedStyle(document.querySelector('#mobile-controls')).display;
-  return {left:panel.left,right:panel.right,width:panel.width,viewport:innerWidth,settingsButton:button.width,controls};
+  return {left:panel.left,right:panel.right,width:panel.width,viewport:innerWidth,settingsButton:button.width,controls,providerTitle:document.querySelector('#town-settings header h2')?.textContent};
 });
 if(mobileLayout.left<0||mobileLayout.right>mobileLayout.viewport+1||mobileLayout.width>mobileLayout.viewport) errors.push(`mobile settings overflow: ${JSON.stringify(mobileLayout)}`);
-if(mobileLayout.settingsButton<40||mobileLayout.controls==='none') errors.push('mobile town/settings controls are not touch-ready');
+if(mobileLayout.settingsButton<40||mobileLayout.controls==='none'||mobileLayout.providerTitle!=='0x Alpha') errors.push('mobile Nous town/settings controls are not touch-ready');
 await mobile.close();
 await browser.close();
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1);}
-console.log('town-runtime: desktop + mobile PASS');
-console.log(JSON.stringify({boot,collision,dialogue,before,after,safety,mobileLayout},null,2));
+console.log('town-runtime: desktop + mobile + Nous 0x Alpha settings PASS');
+console.log(JSON.stringify({boot,collision,dialogue,before,after,safety,settings,mobileLayout},null,2));
