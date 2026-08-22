@@ -18,7 +18,9 @@ await page.locator('#enter-btn').click();
 const result = await page.evaluate(() => {
   const town=window.__MAPLES_TOWN__;
   const game=window.__MAPLES_GAME__;
+  const player=game.player;
   const state=town.bridgeApproach;
+
   const glade={x:35,z:0};
   const south={x:40,z:-80};
   const northTrail={x:0,z:80};
@@ -27,18 +29,57 @@ const result = await page.evaluate(() => {
   game.world.clampToArena(south);
   game.world.clampToArena(northTrail);
   game.world.clampToArena(northOffroad);
+
+  // Exercise Blackbriar Run the way a player reaches it: from the wilderness
+  // side. This avoids an artificial exact-center tie while proving the stream
+  // rejects an attempted off-bridge crossing.
+  const waterBlocker=state?.blockers?.find(blocker=>blocker.cx>0);
+  const approachZ=(waterBlocker?.cz||6.45)-1;
+  player.setPosition(waterBlocker?.cx||8,0,approachZ);
+  town.update(0);
+  const afterWater={x:player.position.x,z:player.position.z};
+  const radius=player.radius||.38;
+  const stillInWater=waterBlocker
+    ? Math.abs(afterWater.x-waterBlocker.cx)<waterBlocker.hx+radius&&Math.abs(afterWater.z-waterBlocker.cz)<waterBlocker.hz+radius
+    : true;
+
+  const bridgeZ=waterBlocker?.cz||6.45;
+  player.setPosition(0,0,bridgeZ);
+  town.update(0);
+  const bridgeCenter={x:player.position.x,z:player.position.z};
+
+  // The player can use the larger travel map, but hostile AI must retain the
+  // original encounter footprint instead of chasing down the new road.
+  const enemy=(game.enemies||[]).find(item=>item&&!item.dead&&item.position);
+  let enemyDistance=null;
+  if(enemy){
+    enemy.position.set(0,0,-50);
+    game._updateEnemies(0,0);
+    enemyDistance=Math.hypot(enemy.position.x,enemy.position.z);
+  }
+
+  const deckMinY=Math.min(...(state?.deck||[]).map(mesh=>mesh.position.y-(mesh.geometry?.parameters?.height||.18)*mesh.scale.y*.5));
+
   return {
-    ready:Boolean(state?.ready&&state?.deckGroundAligned&&town.__mosswakeBridge&&town.__largerWorldApproach&&town.__authoredLargerWorldBounds),
+    ready:Boolean(state?.ready&&state?.deckGroundAligned&&state?.waterlinePolished&&town.__mosswakeBridge&&town.__largerWorldApproach&&town.__authoredLargerWorldBounds&&town.__expandedWorldCombatContainment),
     deck:state?.deck?.length||0,
     storyScenery:state?.storyScenery?.length||0,
     nature:state?.nature?.length||0,
     storyMarker:state?.storyMarker?.name||null,
     waterName:state?.water?.name||null,
+    waterY:state?.water?.position?.y??null,
+    deckMinY,
     blockers:state?.blockers?.length||0,
     bounds:state?.bounds||null,
     presentationBounds:town.presentation?.bounds||null,
     arenaRadius:game.world.arenaRadius,
-    glade,south,northTrail,northOffroad
+    glade,south,northTrail,northOffroad,
+    stillInWater,
+    afterWater,
+    bridgeCenter,
+    bridgeZ,
+    waterPushes:state?.waterPushes||0,
+    enemyDistance
   };
 });
 
@@ -53,6 +94,10 @@ if(Math.hypot(result.glade.x,result.glade.z)>34.001) errors.push(`combat glade b
 if(result.south.x>26.001||result.south.z<-62.001) errors.push(`southern approach boundary failed: ${JSON.stringify(result.south)}`);
 if(Math.abs(result.northTrail.x)>.001||result.northTrail.z>68.001) errors.push(`northern road extension failed: ${JSON.stringify(result.northTrail)}`);
 if(result.northOffroad.x>28.001||result.northOffroad.z>50.001) errors.push(`north outskirts could bypass the authored road: ${JSON.stringify(result.northOffroad)}`);
+if(result.stillInWater||result.waterPushes<1||result.afterWater.z>=result.bridgeZ) errors.push(`Blackbriar Run did not reject the wilderness-side crossing: ${JSON.stringify(result)}`);
+if(Math.abs(result.bridgeCenter.x)>.05||Math.abs(result.bridgeCenter.z-result.bridgeZ)>.08) errors.push(`bridge center was incorrectly blocked: ${JSON.stringify(result.bridgeCenter)}`);
+if(result.enemyDistance==null||result.enemyDistance>34.001) errors.push(`hostile escaped the original combat glade: ${result.enemyDistance}`);
+if(result.waterY==null||result.waterY>=result.deckMinY) errors.push(`bridge waterline overlaps the timber deck: water=${result.waterY} deckMin=${result.deckMinY}`);
 if(errors.length){console.error(errors.join('\n'));process.exit(1);}
-console.log('MOSSWAKE BRIDGE INIT/BOUNDS PASS');
+console.log('MOSSWAKE BRIDGE APPROACH PASS');
 console.log(JSON.stringify(result,null,2));
