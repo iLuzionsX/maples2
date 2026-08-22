@@ -20,7 +20,7 @@ const job = {
 const patch = `diff --git a/src/narrow-hud-fix.css b/src/narrow-hud-fix.css
 --- a/src/narrow-hud-fix.css
 +++ b/src/narrow-hud-fix.css
-@@ -1,2 +1,2 @@
+@@ -1 +1 @@
 -.hud { gap: 4px; }
 +.hud { gap: 6px; }
 `;
