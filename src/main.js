@@ -20,6 +20,7 @@ import { installPerformancePass } from './game/PerformancePass.js';
 import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
+import { installCameraPitchControls } from './game/CameraPitchControls.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -43,6 +44,7 @@ const performanceDisabled = new URLSearchParams(location.search).get('perf') ===
 const performancePass = performanceDisabled ? null : installPerformancePass(game);
 const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
 installMobileCameraControls(game);
+installCameraPitchControls(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
