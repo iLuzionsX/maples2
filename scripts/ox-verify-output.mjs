@@ -20,7 +20,7 @@ export function normalizePatchOutput(output) {
   let text = String(output ?? '').replace(/\r\n/g, '\n').trim();
   if (!text) throw new Error('Ox patch output is empty.');
 
-  const fenced = text.match(/^```(?:diff|patch)?\s*\n([\s\S]*?)\n```$/i);
+  const fenced = text.match(/```(?:diff|patch)?\s*\n([\s\S]*?)\n```/i);
   if (fenced) text = fenced[1].trim();
 
   const gitStart = text.search(/^diff --git /m);
