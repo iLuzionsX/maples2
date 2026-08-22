@@ -8,20 +8,82 @@ const JOB_DIR = '.ox/jobs';
 const OUTPUT_DIR = 'dist/__ox';
 const MAX_FILE_BYTES = 1_500_000;
 const MAX_TOTAL_BYTES = 6_000_000;
+const REQUEST_TIMEOUT_MS = 600_000;
 
 function cleanText(value, max = 20_000) {
   return String(value ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max);
 }
 
-export function extractChatText(response) {
-  const content = response?.choices?.[0]?.message?.content;
-  if (typeof content === 'string') return content.trim();
+function contentText(content) {
+  if (typeof content === 'string') return content;
   if (!Array.isArray(content)) return '';
   return content.map(part => {
     if (typeof part === 'string') return part;
     if (typeof part?.text === 'string') return part.text;
+    if (typeof part?.content === 'string') return part.content;
     return '';
-  }).filter(Boolean).join('\n').trim();
+  }).join('');
+}
+
+export function extractChatText(response) {
+  return contentText(response?.choices?.[0]?.message?.content).trim();
+}
+
+function parseStreamEvent(block) {
+  const data = block
+    .split('\n')
+    .filter(line => line.startsWith('data:'))
+    .map(line => line.slice(5).trimStart())
+    .join('\n')
+    .trim();
+  if (!data || data === '[DONE]') return null;
+  try { return JSON.parse(data); } catch { return null; }
+}
+
+export async function readChatStream(response, onFirstChunk = null) {
+  const contentType = response?.headers?.get?.('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const data = await response.json();
+    return { text: extractChatText(data), model: cleanText(data?.model, 160) };
+  }
+  if (!response?.body?.getReader) throw new Error('Nous returned no readable response stream.');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let output = '';
+  let model = '';
+  let firstChunk = true;
+
+  const consume = block => {
+    const payload = parseStreamEvent(block);
+    if (!payload) return;
+    if (payload.model) model = cleanText(payload.model, 160);
+    const choice = payload?.choices?.[0];
+    const delta = contentText(choice?.delta?.content);
+    if (delta) output += delta;
+    else if (typeof choice?.text === 'string') output += choice.text;
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value?.length && firstChunk) {
+      firstChunk = false;
+      onFirstChunk?.();
+    }
+    buffer += decoder.decode(value, { stream: true });
+    buffer = buffer.replace(/\r\n/g, '\n');
+    let boundary;
+    while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+      consume(buffer.slice(0, boundary));
+      buffer = buffer.slice(boundary + 2);
+    }
+  }
+
+  buffer += decoder.decode();
+  if (buffer.trim()) consume(buffer);
+  return { text: output.trim(), model };
 }
 
 export function pickOxAlphaModel(response) {
@@ -132,36 +194,51 @@ async function runJob(job, rootDir, apiKey) {
   const files = readJobFiles(job, rootDir);
   const messages = buildMessages(job, files);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 180_000);
+  const startedAt = Date.now();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const model = await resolveModel(apiKey, job.model, controller.signal);
     const response = await fetch(`${NOUS_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream'
       },
       signal: controller.signal,
       body: JSON.stringify({
         model,
         messages,
         max_tokens: job.maxTokens,
-        stream: false,
+        stream: true,
         tags: ['product=maples', 'workflow=code-delegation']
       })
     });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(cleanText(data?.error?.message || data?.message, 500) || `Nous request failed (${response.status})`);
-    const text = extractChatText(data);
+    if (!response.ok) {
+      const raw = await response.text().catch(() => '');
+      let data = {};
+      try { data = JSON.parse(raw); } catch {}
+      throw new Error(cleanText(data?.error?.message || data?.message || raw, 500) || `Nous request failed (${response.status})`);
+    }
+
+    const streamed = await readChatStream(response, () => {
+      console.log(`OX STREAM CONNECTED: ${job.id} after ${Date.now() - startedAt}ms`);
+    });
+    const text = streamed.text;
     if (!text) throw new Error('Nous returned no response text.');
     return {
       id: job.id,
-      model: cleanText(data.model || model, 160),
+      model: cleanText(streamed.model || model, 160),
       mode: job.mode,
       files: job.files,
       created_at: new Date().toISOString(),
       output: text
     };
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`Nous/Ox request exceeded ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds.`);
+    }
+    throw error;
   } finally {
     clearTimeout(timeout);
   }
