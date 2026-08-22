@@ -54,6 +54,7 @@ export function validateJob(raw, fileName = 'job.json') {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error(`${fileName}: job must be an object`);
   const id = cleanText(raw.id || path.basename(fileName, path.extname(fileName)), 80);
   if (!/^[a-z0-9][a-z0-9._-]{0,79}$/i.test(id)) throw new Error(`${fileName}: invalid job id`);
+  if (id.toLowerCase() === 'index') throw new Error(`${fileName}: job id "index" is reserved`);
   const task = cleanText(raw.task, 20_000);
   if (!task) throw new Error(`${fileName}: task is required`);
   const files = Array.isArray(raw.files) ? raw.files.map(safeRelativePath).filter(Boolean) : [];
@@ -68,18 +69,34 @@ export function validateJob(raw, fileName = 'job.json') {
   return { id, enabled: raw.enabled === true, task, files, model, maxTokens, mode };
 }
 
+export function validateEnabledJobs(jobs) {
+  const ids = new Set();
+  for (const job of jobs) {
+    const key = job.id.toLowerCase();
+    if (ids.has(key)) throw new Error(`Duplicate enabled Ox job id: ${job.id}`);
+    ids.add(key);
+  }
+  return jobs;
+}
+
 export function readJobFiles(job, rootDir = process.cwd()) {
+  const rootReal = fs.realpathSync(rootDir);
+  const rootPrefix = rootReal.endsWith(path.sep) ? rootReal : `${rootReal}${path.sep}`;
   let totalBytes = 0;
   return job.files.map(relativePath => {
-    const absolutePath = path.resolve(rootDir, relativePath);
-    const root = path.resolve(rootDir) + path.sep;
-    if (!absolutePath.startsWith(root)) throw new Error(`${job.id}: path escaped repository root: ${relativePath}`);
-    const stat = fs.statSync(absolutePath);
+    const absolutePath = path.resolve(rootReal, relativePath);
+    if (!absolutePath.startsWith(rootPrefix)) throw new Error(`${job.id}: path escaped repository root: ${relativePath}`);
+
+    const realPath = fs.realpathSync(absolutePath);
+    if (!realPath.startsWith(rootPrefix)) throw new Error(`${job.id}: resolved path escaped repository root: ${relativePath}`);
+    if (realPath !== absolutePath) throw new Error(`${job.id}: symlinked paths are not allowed: ${relativePath}`);
+
+    const stat = fs.statSync(realPath);
     if (!stat.isFile()) throw new Error(`${job.id}: not a file: ${relativePath}`);
     if (stat.size > MAX_FILE_BYTES) throw new Error(`${job.id}: file exceeds ${MAX_FILE_BYTES} bytes: ${relativePath}`);
     totalBytes += stat.size;
     if (totalBytes > MAX_TOTAL_BYTES) throw new Error(`${job.id}: selected files exceed ${MAX_TOTAL_BYTES} total bytes`);
-    return { path: relativePath, content: fs.readFileSync(absolutePath, 'utf8') };
+    return { path: relativePath, content: fs.readFileSync(realPath, 'utf8') };
   });
 }
 
@@ -161,14 +178,14 @@ export async function main(rootDir = process.cwd()) {
     console.log('OX DELEGATION SKIP: no job directory');
     return;
   }
-  const jobs = fs.readdirSync(jobDir)
+  const jobs = validateEnabledJobs(fs.readdirSync(jobDir)
     .filter(name => name.endsWith('.json'))
     .sort()
     .map(name => {
       const raw = JSON.parse(fs.readFileSync(path.join(jobDir, name), 'utf8'));
       return validateJob(raw, name);
     })
-    .filter(job => job.enabled);
+    .filter(job => job.enabled));
 
   if (!jobs.length) {
     console.log('OX DELEGATION SKIP: no enabled jobs');
