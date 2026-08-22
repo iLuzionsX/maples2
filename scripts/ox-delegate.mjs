@@ -209,7 +209,7 @@ async function runJob(job, rootDir, apiKey) {
       body: JSON.stringify({
         model,
         messages,
-        reasoning_effort: 'low',
+        reasoning_effort: 'high',
         include_reasoning: false,
         max_tokens: job.maxTokens,
         stream: true,
