@@ -43,12 +43,13 @@ fs.writeFileSync(tempPath, `${source.slice(0, markerIndex)}\nawait context.close
 
 await run('npm', ['run', 'build'], 90000);
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
-const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'inherit', env, shell: false, detached: true });
+const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], { stdio:'inherit', env, shell:false, detached:true });
 try {
   await ready();
   await run('node', [tempPath], 180000);
   await run('node', ['tests/town-runtime.mjs'], 180000);
+  await run('node', ['tests/town-expansion-collision.mjs'], 180000);
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
-  fs.rmSync(tempPath, { force: true });
+  fs.rmSync(tempPath, { force:true });
 }
