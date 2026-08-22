@@ -1,5 +1,7 @@
 const WINDOW_MS = 60_000;
 const MAX_REQUESTS_PER_WINDOW = 24;
+const NOUS_BASE_URL = 'https://inference-api.nousresearch.com/v1';
+const AUTO_0X_ALPHA = 'auto:0x-alpha';
 const buckets = new Map();
 
 function json(statusCode, body) {
@@ -37,15 +39,31 @@ function sameOrigin(event) {
   try { return new URL(origin).host === host; } catch { return false; }
 }
 
-export function extractOutputText(response) {
-  const pieces = [];
-  for (const item of response?.output || []) {
-    if (item?.type !== 'message') continue;
-    for (const part of item.content || []) {
-      if (part?.type === 'output_text' && typeof part.text === 'string') pieces.push(part.text);
-    }
-  }
-  return pieces.join('\n').trim();
+export function extractChatText(response) {
+  const content = response?.choices?.[0]?.message?.content;
+  if (typeof content === 'string') return content.trim();
+  if (!Array.isArray(content)) return '';
+  return content.map(part => {
+    if (typeof part === 'string') return part;
+    if (typeof part?.text === 'string') return part.text;
+    return '';
+  }).filter(Boolean).join('\n').trim();
+}
+
+export function pickNous0xAlphaModel(response) {
+  const rows = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+  const ranked = rows.map(row => {
+    const id = text(row?.id || row?.model || row?.name, 160);
+    const haystack = [id, row?.name, row?.display_name, row?.description].filter(Boolean).join(' ');
+    let score = 0;
+    if (/0x[\s/_:.-]*alpha/i.test(haystack)) score += 100;
+    if (/\b0x\b/i.test(haystack) && /alpha/i.test(haystack)) score += 70;
+    if (/0x/i.test(id) && /alpha/i.test(id)) score += 50;
+    if (/:free\b/i.test(id) || /\bfree\b/i.test(haystack)) score += 5;
+    return { id, score };
+  }).filter(item => item.id && item.score > 0);
+  ranked.sort((a, b) => b.score - a.score || a.id.length - b.id.length || a.id.localeCompare(b.id));
+  return ranked[0]?.id || '';
 }
 
 export function buildInstructions(npc, context, isTest = false) {
@@ -65,12 +83,37 @@ export function buildInstructions(npc, context, isTest = false) {
   ].join('\n');
 }
 
-function buildInput(playerLine, history) {
-  const prior = history.slice(-6).map(turn => {
-    const role = turn?.role === 'npc' ? 'NPC' : 'Rowan';
-    return `${role}: ${text(turn?.text, 400)}`;
-  }).filter(Boolean);
-  return [...prior, `Rowan: ${playerLine}`, 'NPC:'].join('\n');
+function buildMessages(npc, playerLine, context, history, isTest) {
+  const messages = [{ role: 'system', content: buildInstructions(npc, context, isTest) }];
+  for (const turn of history.slice(-6)) {
+    const content = text(turn?.text, 400);
+    if (!content) continue;
+    messages.push({ role: turn?.role === 'npc' ? 'assistant' : 'user', content });
+  }
+  messages.push({ role: 'user', content: playerLine });
+  return messages;
+}
+
+async function resolveModel(apiKey, requestedModel, signal) {
+  if (requestedModel !== AUTO_0X_ALPHA) return requestedModel;
+  const response = await fetch(`${NOUS_BASE_URL}/models`, {
+    headers: { 'Authorization': `Bearer ${apiKey}` },
+    signal
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = text(data?.error?.message || data?.message, 240) || `Nous model discovery failed (${response.status}).`;
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+  const model = pickNous0xAlphaModel(data);
+  if (!model) {
+    const error = new Error('0x Alpha is not currently visible to this Nous Portal API key. Check the Portal model catalog or key access.');
+    error.status = 404;
+    throw error;
+  }
+  return model;
 }
 
 export async function handler(event) {
@@ -83,13 +126,12 @@ export async function handler(event) {
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Invalid JSON.' }); }
 
-  // BYOK only: Maples never falls back to a deployment-owned provider key.
-  // A caller can consume only the credentials they explicitly supplied.
+  // Strict BYOK: Maples never falls back to a deployment-owned provider key.
   const apiKey = text(body.apiKey, 256);
-  if (apiKey.length < 20 || /\s/.test(apiKey)) return json(400, { error: 'A valid API key is required.' });
+  if (apiKey.length < 20 || /\s/.test(apiKey)) return json(400, { error: 'A valid Nous Portal API key is required.' });
 
-  const model = text(body.model || 'gpt-5.6', 80);
-  if (!/^[a-zA-Z0-9._:-]+$/.test(model)) return json(400, { error: 'Invalid model name.' });
+  const requestedModel = text(body.model || AUTO_0X_ALPHA, 120);
+  if (!/^[a-zA-Z0-9._:/-]+$/.test(requestedModel)) return json(400, { error: 'Invalid model name.' });
 
   const npc = {
     name: text(body.npc?.name, 60) || 'Townsfolk',
@@ -106,7 +148,8 @@ export async function handler(event) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 16_000);
   try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
+    const model = await resolveModel(apiKey, requestedModel, controller.signal);
+    const response = await fetch(`${NOUS_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -115,24 +158,27 @@ export async function handler(event) {
       signal: controller.signal,
       body: JSON.stringify({
         model,
-        instructions: buildInstructions(npc, context, isTest),
-        input: buildInput(playerLine, history),
-        max_output_tokens: isTest ? 24 : 180
+        messages: buildMessages(npc, playerLine, context, history, isTest),
+        max_tokens: isTest ? 24 : 180,
+        stream: false,
+        tags: ['product=maples', 'user=maples-npc']
       })
     });
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const message = text(data?.error?.message, 240) || `Provider request failed (${response.status}).`;
-      return json(response.status === 401 ? 401 : 502, { error: message });
+      const message = text(data?.error?.message || data?.message, 240) || `Nous request failed (${response.status}).`;
+      return json(response.status === 401 || response.status === 403 ? response.status : 502, { error: message });
     }
 
-    const output = extractOutputText(data);
-    if (!output) return json(502, { error: 'The provider returned no dialogue text.' });
-    return json(200, { text: output.slice(0, 900), model: data.model || model });
+    const output = extractChatText(data);
+    if (!output) return json(502, { error: 'Nous returned no dialogue text.' });
+    return json(200, { text: output.slice(0, 900), model: data.model || model, provider: 'nous' });
   } catch (error) {
     if (error?.name === 'AbortError') return json(504, { error: 'Cloud AI timed out.' });
-    return json(502, { error: 'Cloud AI is temporarily unavailable.' });
+    if (error?.status === 401 || error?.status === 403) return json(error.status, { error: text(error.message, 240) });
+    if (error?.status === 404) return json(404, { error: text(error.message, 240) });
+    return json(502, { error: text(error?.message, 240) || 'Cloud AI is temporarily unavailable.' });
   } finally {
     clearTimeout(timeout);
   }
