@@ -1,6 +1,6 @@
 export function clearLumenwoodFootprint(game) {
   const decor = game?.world?.decor;
-  if (!decor) return { hiddenRoots: 0, hiddenMeshes: 0 };
+  if (!decor) return { hiddenRoots: 0, hiddenMeshes: 0, natureRemoved: 0 };
 
   let hiddenRoots = 0;
   let hiddenMeshes = 0;
@@ -23,5 +23,17 @@ export function clearLumenwoodFootprint(game) {
     hiddenRoots++;
   }
 
-  return { hiddenRoots, hiddenMeshes };
+  // NatureInstancing groups the imported foliage roots after this cleanup.
+  // Remove retired roots from that source list entirely so a hidden first
+  // exemplar can never suppress batching for the remaining forest foliage.
+  let natureRemoved = 0;
+  const nature = game.natureAssetManager;
+  if (nature?.instances) {
+    const kept = nature.instances.filter(root => !root.userData?.lumenwoodCleared);
+    natureRemoved = nature.instances.length - kept.length;
+    nature.instances = kept;
+    nature.count = kept.length;
+  }
+
+  return { hiddenRoots, hiddenMeshes, natureRemoved };
 }
