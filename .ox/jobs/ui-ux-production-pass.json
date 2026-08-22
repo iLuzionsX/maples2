@@ -1,0 +1,15 @@
+{
+  "id": "ui-ux-production-pass",
+  "enabled": true,
+  "mode": "patch",
+  "task": "Act as the lead UI/UX designer-engineer for Maples, an original stylized fantasy Three.js browser action-RPG targeting an X-worthy commercial-indie showcase. Make a cohesive, production-quality visual and usability pass over the supplied UI. The result should feel like it came from an expensive, highly intentional game design team: distinctive, elegant, tactile, readable, modern without looking like a generic SaaS interface, and strongly appropriate to an original fantasy action-RPG. Prioritize strong visual hierarchy; beautiful but restrained fantasy character; premium typography, spacing, and composition; health/resource/ability readability during combat; HUD coherence; excellent interaction states; cleaner information density; mobile ergonomics; 320-430px phone widths; thumb reach and touch targets; safe-area handling; readability over a moving 3D world; avoiding UI overlap; avoiding unnecessary visual noise; and effects that do not materially hurt FPS. Preserve all gameplay behavior and existing DOM/selector contracts unless a change is truly necessary. Do not change combat, movement, camera, enemy, or other gameplay logic. Do not add external dependencies or unlicensed assets. Do not merely restyle everything for the sake of change. Keep strong existing ideas and improve weak ones. The current UI already includes a premium Lumenwood polish layer and showcase layer, so judge those critically rather than replacing them wholesale. Return a production-ready canonical unified diff only, with no Markdown fences or prose. Modify only supplied files, do not add/delete/rename files, and preserve unrelated behavior.",
+  "files": [
+    "index.html",
+    "src/style.css",
+    "src/showcase.css",
+    "src/narrow-hud-fix.css",
+    "src/premium-ui.css"
+  ],
+  "model": "stealth/ox-alpha",
+  "max_tokens": 30000
+}
