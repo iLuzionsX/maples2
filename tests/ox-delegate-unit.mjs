@@ -6,13 +6,36 @@ import {
   buildMessages,
   extractChatText,
   pickOxAlphaModel,
+  readChatStream,
   readJobFiles,
   validateEnabledJobs,
   validateJob
 } from '../scripts/ox-delegate.mjs';
 
 assert.equal(extractChatText({ choices: [{ message: { content: '  patch  ' } }] }), 'patch');
-assert.equal(extractChatText({ choices: [{ message: { content: [{ text: 'a' }, { text: 'b' }] } }] }), 'a\nb');
+assert.equal(extractChatText({ choices: [{ message: { content: [{ text: 'a' }, { text: 'b' }] } }] }), 'ab');
+
+const encoder = new TextEncoder();
+const sseBody = new ReadableStream({
+  start(controller) {
+    controller.enqueue(encoder.encode('data: {"model":"stealth/ox-alpha","choices":[{"delta":{"reasoning_content":"thinking"}}]}\n\n'));
+    controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"content":"diff --git a/x b/x\\n"}}]}\n'));
+    controller.enqueue(encoder.encode('\ndata: {"choices":[{"delta":{"content":"@@ -1 +1 @@\\n"}}]}\n\ndata: [DONE]\n\n'));
+    controller.close();
+  }
+});
+let streamConnected = 0;
+const streamed = await readChatStream(new Response(sseBody, { headers: { 'content-type': 'text/event-stream' } }), () => { streamConnected += 1; });
+assert.equal(streamConnected, 1);
+assert.equal(streamed.model, 'stealth/ox-alpha');
+assert.equal(streamed.text, 'diff --git a/x b/x\n@@ -1 +1 @@');
+
+const jsonStreamFallback = await readChatStream(new Response(JSON.stringify({
+  model: 'stealth/ox-alpha',
+  choices: [{ message: { content: 'fallback patch' } }]
+}), { headers: { 'content-type': 'application/json' } }));
+assert.equal(jsonStreamFallback.text, 'fallback patch');
+assert.equal(jsonStreamFallback.model, 'stealth/ox-alpha');
 
 assert.equal(pickOxAlphaModel({ data: [
   { id: 'other/model' },
