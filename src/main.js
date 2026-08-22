@@ -3,6 +3,7 @@ import './asset-polish.css';
 import './showcase.css';
 import './narrow-hud-fix.css';
 import './premium-ui.css';
+import './town.css';
 import { Game } from './game/Game.js';
 import { enhanceInstance } from './game/Enhancements.js';
 import { installAssetVisuals } from './game/AssetVisuals.js';
@@ -20,6 +21,7 @@ import { installPerformancePass } from './game/PerformancePass.js';
 import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
+import { installLumenwoodTown } from './game/TownSystem.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -43,6 +45,7 @@ const performanceDisabled = new URLSearchParams(location.search).get('perf') ===
 const performancePass = performanceDisabled ? null : installPerformancePass(game);
 const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
 installMobileCameraControls(game);
+const town = installLumenwoodTown(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
@@ -66,10 +69,11 @@ Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).th
     performanceExtensions?.freezeStaticDecor();
     await installNatureInstancing(game);
   }
-  enterButton.textContent = 'Enter the Glade';
+  enterButton.textContent = 'Enter Lumenwood';
   enterButton.disabled = false;
   enterButton.dataset.ready = 'true';
 });
 
 game.start();
 window.__MAPLES_GAME__ = game;
+window.__MAPLES_TOWN__ = town;
