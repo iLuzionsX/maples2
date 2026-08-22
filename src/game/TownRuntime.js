@@ -9,6 +9,7 @@ const TOWN_MIN_Z = 9.4;
 const TOWN_MAX_Z = 33.15;
 const TOWN_HALF_WIDTH = 18.2;
 const COLLISION_EPSILON = 0.002;
+const MODAL_HOSTILE_MARGIN = 1.5;
 
 // cx, cz, halfWidth, halfDepth. These stay deliberately simple and cheap:
 // town buildings are stylized box footprints and do not need a physics engine.
@@ -80,6 +81,20 @@ function installAuthoredWorldBounds(town) {
   };
 }
 
+function hostileCanThreatenModal(town) {
+  const player = town.game.player;
+  if (!player) return false;
+  for (const enemy of town.game.enemies || []) {
+    if (!enemy || enemy.dead || enemy.remove || !enemy.position) continue;
+    const dx = enemy.position.x - player.position.x;
+    const dz = enemy.position.z - player.position.z;
+    const attackRange = Number.isFinite(enemy.attackRange) ? enemy.attackRange : (enemy.isBoss ? 2.4 : 1.45);
+    const threatRange = attackRange + MODAL_HOSTILE_MARGIN;
+    if (dx*dx + dz*dz <= threatRange*threatRange) return true;
+  }
+  return false;
+}
+
 export function installTownRuntimeGuards(town) {
   if (!town || town.__runtimeGuardsInstalled) return town;
 
@@ -105,13 +120,14 @@ export function installTownRuntimeGuards(town) {
     }
   } catch {}
 
-  // Opening a blocking modal in the hostile glade would remove the player's
-  // controls while enemies continue simulating. Settings remain available on
-  // the title screen and anywhere inside the warded town, never mid-encounter.
+  // Blocking settings are available on the title screen and in Lumenwood only
+  // when Rowan is beyond every live hostile's immediate attack/lunge envelope.
+  // This prevents a ward-edge enemy from damaging an undefendable player while
+  // the modal has intentionally cleared movement and combat input.
   const openSettings = town.openSettings.bind(town);
   town.openSettings = function openTownSettingsSafely() {
-    if (this.game.started && !isTownSafeZone(this.game.player.position)) {
-      this.game.toast?.('Return to Lumenwood to change settings.', 1.4);
+    if (this.game.started && (!isTownSafeZone(this.game.player.position) || hostileCanThreatenModal(this))) {
+      this.game.toast?.('Move deeper into Lumenwood to change settings.', 1.4);
       return false;
     }
     openSettings();
@@ -142,6 +158,7 @@ export function installTownRuntimeGuards(town) {
   town.__allocationStableMatrices = true;
   town.__townCollisions = true;
   town.__authoredWorldBounds = true;
+  town.__modalHostileSafety = true;
   town.__runtimeGuardsInstalled = true;
   return town;
 }
