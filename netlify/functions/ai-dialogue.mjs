@@ -32,9 +32,8 @@ function rateLimited(ip) {
 
 function sameOrigin(event) {
   const origin = event.headers?.origin;
-  if (!origin) return true;
   const host = event.headers?.host || event.headers?.['x-forwarded-host'];
-  if (!host) return false;
+  if (!origin || !host) return false;
   try { return new URL(origin).host === host; } catch { return false; }
 }
 
@@ -76,7 +75,7 @@ function buildInput(playerLine, history) {
 
 export async function handler(event) {
   if (event.httpMethod !== 'POST') return json(405, { error: 'POST required.' });
-  if (!sameOrigin(event)) return json(403, { error: 'Cross-origin requests are not allowed.' });
+  if (!sameOrigin(event)) return json(403, { error: 'A verified same-origin browser request is required.' });
   const ip = event.headers?.['x-nf-client-connection-ip'] || event.headers?.['x-forwarded-for']?.split(',')[0]?.trim();
   if (rateLimited(ip)) return json(429, { error: 'Too many dialogue requests. Try again shortly.' });
   if ((event.body || '').length > 18_000) return json(413, { error: 'Dialogue request is too large.' });
@@ -84,8 +83,9 @@ export async function handler(event) {
   let body;
   try { body = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'Invalid JSON.' }); }
 
-  const suppliedKey = text(body.apiKey, 256);
-  const apiKey = suppliedKey || process.env.OPENAI_API_KEY || '';
+  // BYOK only: Maples never falls back to a deployment-owned provider key.
+  // A caller can consume only the credentials they explicitly supplied.
+  const apiKey = text(body.apiKey, 256);
   if (apiKey.length < 20 || /\s/.test(apiKey)) return json(400, { error: 'A valid API key is required.' });
 
   const model = text(body.model || 'gpt-5.6', 80);
