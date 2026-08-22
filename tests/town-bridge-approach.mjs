@@ -23,10 +23,12 @@ const result = await page.evaluate(() => {
 
   const glade={x:35,z:0};
   const south={x:40,z:-80};
-  const north={x:45,z:80};
+  const northTrail={x:0,z:80};
+  const northOffroad={x:40,z:60};
   game.world.clampToArena(glade);
   game.world.clampToArena(south);
-  game.world.clampToArena(north);
+  game.world.clampToArena(northTrail);
+  game.world.clampToArena(northOffroad);
 
   const waterBlocker=state?.blockers?.find(blocker=>blocker.cx>0);
   player.setPosition(waterBlocker?.cx||8,0,waterBlocker?.cz||6.45);
@@ -43,7 +45,7 @@ const result = await page.evaluate(() => {
   const bridgeCenter={x:player.position.x,z:player.position.z};
 
   return {
-    ready:Boolean(state?.ready&&town.__mosswakeBridge&&town.__largerWorldApproach),
+    ready:Boolean(state?.ready&&town.__mosswakeBridge&&town.__largerWorldApproach&&town.__authoredLargerWorldBounds),
     deck:state?.deck?.length||0,
     storyScenery:state?.storyScenery?.length||0,
     nature:state?.nature?.length||0,
@@ -53,9 +55,10 @@ const result = await page.evaluate(() => {
     bounds:state?.bounds||null,
     presentationBounds:town.presentation?.bounds||null,
     arenaRadius:game.world.arenaRadius,
-    glade,south,north,
+    glade,south,northTrail,northOffroad,
     stillInWater,
     bridgeCenter,
+    bridgeZ,
     waterPushes:state?.waterPushes||0
   };
 });
@@ -64,14 +67,15 @@ await browser.close();
 if(!result.ready) errors.push(`Mosswake Bridge did not initialize: ${JSON.stringify(result)}`);
 if(result.deck<13||result.storyScenery<6||result.nature<16) errors.push(`bridge/world asset population incomplete: ${JSON.stringify(result)}`);
 if(result.storyMarker!=='MosswakeBridgeStoryMarker'||result.waterName!=='BlackbriarRunWater'||result.blockers!==2) errors.push(`bridge environmental story layer incomplete: ${JSON.stringify(result)}`);
-if(!result.bounds||result.bounds.southMinZ>-62||result.bounds.northMaxZ<68||result.bounds.northHalfWidth<36) errors.push(`larger world bounds incomplete: ${JSON.stringify(result.bounds)}`);
+if(!result.bounds||result.bounds.southMinZ>-62||result.bounds.northMaxZ<68||result.bounds.northTrailHalfWidth<18) errors.push(`larger world bounds incomplete: ${JSON.stringify(result.bounds)}`);
 if(!result.presentationBounds||result.presentationBounds.southMinZ>-62||result.presentationBounds.northMaxZ<68) errors.push(`presentation did not inherit larger bounds: ${JSON.stringify(result.presentationBounds)}`);
 if(result.arenaRadius<68) errors.push(`arena metadata did not expand: ${result.arenaRadius}`);
 if(Math.hypot(result.glade.x,result.glade.z)>34.001) errors.push(`combat glade boundary regressed: ${JSON.stringify(result.glade)}`);
 if(result.south.x>26.001||result.south.z<-62.001) errors.push(`southern approach boundary failed: ${JSON.stringify(result.south)}`);
-if(result.north.x>36.001||result.north.z>68.001) errors.push(`northern outskirts boundary failed: ${JSON.stringify(result.north)}`);
+if(Math.abs(result.northTrail.x)>.001||result.northTrail.z>68.001) errors.push(`northern road extension failed: ${JSON.stringify(result.northTrail)}`);
+if(result.northOffroad.x>28.001||result.northOffroad.z>50.001) errors.push(`north outskirts could bypass the authored road: ${JSON.stringify(result.northOffroad)}`);
 if(result.stillInWater||result.waterPushes<1) errors.push(`Blackbriar Run did not force the bridge crossing: ${JSON.stringify(result)}`);
-if(Math.abs(result.bridgeCenter.x)>.05||Math.abs(result.bridgeCenter.z-(result.bounds?6.45:6.45))>.08) errors.push(`bridge center was incorrectly blocked: ${JSON.stringify(result.bridgeCenter)}`);
+if(Math.abs(result.bridgeCenter.x)>.05||Math.abs(result.bridgeCenter.z-result.bridgeZ)>.08) errors.push(`bridge center was incorrectly blocked: ${JSON.stringify(result.bridgeCenter)}`);
 if(errors.length){console.error(errors.join('\n'));process.exit(1);}
 console.log('MOSSWAKE BRIDGE APPROACH PASS');
 console.log(JSON.stringify(result,null,2));
