@@ -19,11 +19,9 @@ await page.locator('#enter-btn').click();
 
 const result = await page.evaluate(() => {
   const town=window.__MAPLES_TOWN__, player=window.__MAPLES_GAME__.player;
-  const roads=town.presentation?.surfaces?.roads||[];
-  const roadsFlat=Boolean(town.__townRoadSurfacesFlat)&&roads.length>=8&&roads.every(road=>Math.abs(road.rotation.x+Math.PI/2)<1e-6&&Math.abs(road.rotation.z)<1e-6);
   const blockers=town.presentationCollision?.blockers||[];
   const blocker=blockers.find(item=>item.kind==='box')||blockers[0];
-  if(!blocker) return {installed:Boolean(town.__expandedAssetCollisions),count:0,inside:true,source:null,roadsFlat,roadCount:roads.length};
+  if(!blocker) return {installed:Boolean(town.__expandedAssetCollisions),count:0,inside:true,source:null};
 
   if(blocker.kind==='box') player.setPosition(blocker.cx,0,blocker.cz);
   else player.setPosition(blocker.x,0,blocker.z);
@@ -36,13 +34,12 @@ const result = await page.evaluate(() => {
   } else {
     inside=Math.hypot(player.position.x-blocker.x,player.position.z-blocker.z)<blocker.radius+radius;
   }
-  return {installed:Boolean(town.__expandedAssetCollisions),count:blockers.length,inside,source:blocker.source,player:{x:player.position.x,z:player.position.z},roadsFlat,roadCount:roads.length};
+  return {installed:Boolean(town.__expandedAssetCollisions),count:blockers.length,inside,source:blocker.source,player:{x:player.position.x,z:player.position.z}};
 });
 
 await browser.close();
-if(!result.roadsFlat) errors.push(`expanded road surfaces are not flush with terrain: ${JSON.stringify(result)}`);
 if(!result.installed||result.count<8) errors.push(`expected expanded asset collision proxies, got ${JSON.stringify(result)}`);
 if(result.inside) errors.push(`player remained inside expanded asset blocker: ${JSON.stringify(result)}`);
 if(errors.length){console.error(errors.join('\n'));process.exit(1);}
-console.log('TOWN EXPANSION SURFACE + COLLISION PASS');
+console.log('TOWN EXPANSION COLLISION PASS');
 console.log(JSON.stringify(result,null,2));
