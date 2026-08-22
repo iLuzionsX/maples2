@@ -28,6 +28,8 @@ const boot = await page.evaluate(() => {
     rootName:town.root.name,
     dynamicName:town.dynamic.name,
     arenaRadius:game.world.arenaRadius,
+    starterCoins:town.coins,
+    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices),
     settingsVisible:Boolean(document.querySelector('#town-settings-btn')),
     interactVisible:Boolean(document.querySelector('#town-interact')),
     townObjects:town.root.children.length
@@ -36,6 +38,8 @@ const boot = await page.evaluate(() => {
 if(boot.npcCount!==16) errors.push(`desktop expected 16 NPCs, got ${boot.npcCount}`);
 if(boot.rootName!=='LumenwoodCrossing'||boot.dynamicName!=='LumenwoodLife') errors.push('town scene roots missing');
 if(boot.arenaRadius<36) errors.push(`town arena was not expanded: ${boot.arenaRadius}`);
+if(boot.starterCoins!==75) errors.push(`first-run wallet expected 75 coins, got ${boot.starterCoins}`);
+if(!boot.runtimeGuards) errors.push('town runtime guards did not install');
 if(!boot.settingsVisible||!boot.interactVisible||boot.townObjects<20) errors.push('town UI/environment did not install completely');
 
 await page.locator('#enter-btn').click();
@@ -63,7 +67,18 @@ await page.locator('.town-ware').first().click();
 const after = await page.evaluate(() => ({coins:window.__MAPLES_TOWN__.coins,hp:window.__MAPLES_GAME__.player.hp}));
 if(before.wares!==2||after.coins!==before.coins-12||after.hp!==64) errors.push(`shop transaction failed: ${JSON.stringify({before,after})}`);
 
-await page.evaluate(() => window.__MAPLES_TOWN__.openSettings());
+const safety = await page.evaluate(() => {
+  const town=window.__MAPLES_TOWN__, player=window.__MAPLES_GAME__.player;
+  town.closePanels();
+  player.setPosition(0,0,0);
+  const blocked=town.openSettings();
+  const blockedModal=town.modalOpen;
+  player.setPosition(0,0,18);
+  const allowed=town.openSettings();
+  return {blocked,blockedModal,allowed,allowedModal:town.modalOpen};
+});
+if(safety.blocked!==false||safety.blockedModal||safety.allowed!==true||!safety.allowedModal) errors.push(`safe settings gate failed: ${JSON.stringify(safety)}`);
+
 await page.fill('#town-ai-key','sk-test-session-only-1234567890');
 await page.fill('#town-ai-model','gpt-5.6');
 await page.check('#town-ai-enabled');
@@ -88,7 +103,11 @@ await collect(mp,'mobile');
 await mp.goto(baseUrl,{waitUntil:'networkidle'});
 await mp.waitForFunction(() => Boolean(window.__MAPLES_TOWN__) && document.querySelector('#enter-btn')?.dataset.ready==='true',null,{timeout:90000});
 await mp.locator('#enter-btn').click();
-await mp.evaluate(() => window.__MAPLES_TOWN__.openSettings());
+await mp.evaluate(() => {
+  const game=window.__MAPLES_GAME__;
+  game.player.setPosition(0,0,18);
+  window.__MAPLES_TOWN__.openSettings();
+});
 await mp.waitForSelector('#town-settings:not(.hidden)');
 const mobileLayout=await mp.evaluate(() => {
   const panel=document.querySelector('#town-settings').getBoundingClientRect();
@@ -103,4 +122,4 @@ await browser.close();
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1);}
 console.log('town-runtime: desktop + mobile PASS');
-console.log(JSON.stringify({boot,dialogue,before,after,mobileLayout},null,2));
+console.log(JSON.stringify({boot,dialogue,before,after,safety,mobileLayout},null,2));
