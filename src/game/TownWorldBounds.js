@@ -10,6 +10,15 @@ const SOUTH_MIN_Z = -62;
 const SOUTH_CONNECTION_Z = -24;
 const TOWN_CONNECTION_Z = 9.4;
 
+function clampEnemyToCombatGlade(position) {
+  if (!position) return;
+  const distance = Math.hypot(position.x, position.z);
+  if (distance <= GLADE_RADIUS) return;
+  const scale = GLADE_RADIUS / Math.max(distance, .0001);
+  position.x *= scale;
+  position.z *= scale;
+}
+
 export function installTownWorldBounds(town) {
   if (!town?.presentation?.ready) return null;
   const game = town.game;
@@ -21,6 +30,7 @@ export function installTownWorldBounds(town) {
     northMaxZ: NORTH_MAX_Z,
     southHalfWidth: SOUTH_HALF_WIDTH,
     southMinZ: SOUTH_MIN_Z,
+    clampEnemyToCombatGlade,
   };
 
   game.world.arenaRadius = Math.max(game.world.arenaRadius || 28, NORTH_MAX_Z);
@@ -58,6 +68,17 @@ export function installTownWorldBounds(town) {
     }
   };
 
+  // Player travel can now extend far past the combat glade. Keep enemies on the
+  // original encounter footprint so the map expansion does not silently enlarge
+  // aggro/chase space or allow the boss to follow Rowan down the travel road.
+  const updateEnemies = game._updateEnemies.bind(game);
+  game._updateEnemies = function updateEnemiesInsideCombatGlade(...args) {
+    for (const enemy of this.enemies || []) clampEnemyToCombatGlade(enemy?.position);
+    const result = updateEnemies(...args);
+    for (const enemy of this.enemies || []) clampEnemyToCombatGlade(enemy?.position);
+    return result;
+  };
+
   town.presentation.bounds = {
     ...town.presentation.bounds,
     gladeRadius: GLADE_RADIUS,
@@ -67,7 +88,8 @@ export function installTownWorldBounds(town) {
     southHalfWidth: SOUTH_HALF_WIDTH,
     southMinZ: SOUTH_MIN_Z,
   };
-  if (town.bridgeApproach) town.bridgeApproach.bounds = { ...state };
+  if (town.bridgeApproach) town.bridgeApproach.bounds = { ...state, clampEnemyToCombatGlade: undefined };
   town.__authoredLargerWorldBounds = true;
+  town.__expandedWorldCombatContainment = true;
   return state;
 }
