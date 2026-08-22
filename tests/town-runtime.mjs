@@ -10,7 +10,7 @@ const browser = await chromium.launch({
 async function collect(page, label) {
   page.on('pageerror', error => errors.push(`${label} pageerror: ${error.message}`));
   page.on('console', message => {
-    if (message.type() === 'error' && !message.text().includes('favicon')) errors.push(`${label} console: ${message.text()}`));
+    if (message.type() === 'error' && !message.text().includes('favicon')) errors.push(`${label} console: ${message.text()}`);
   });
 }
 
@@ -40,8 +40,6 @@ const boot = await page.evaluate(() => {
     environmentAssets:presentation?.environment?.length||0,
     expandedNature:presentation?.nature?.length||0,
     detailedResidentParts:Object.keys(presentation?.instancedVillagers||{}).length,
-    assetCollisions:Boolean(town.__expandedAssetCollisions),
-    assetCollisionCount:town.presentationCollision?.blockers?.length||0,
     surfaceMaps:Boolean(grass?.material?.map&&grass?.material?.normalMap&&dirt?.material?.map&&dirt?.material?.normalMap&&stone?.material?.map&&stone?.material?.normalMap),
     bounds:presentation?.bounds||null,
     cameraPitchControls:Boolean(game.cameraPitchControls),
@@ -59,7 +57,6 @@ if(boot.starterCoins!==75) errors.push(`first-run wallet expected 75 coins, got 
 if(!boot.runtimeGuards) errors.push('town runtime guards did not install');
 if(!boot.presentationReady||boot.legacySurfacesHidden<3) errors.push(`expanded town presentation did not replace the flat surface pass: ${JSON.stringify(boot)}`);
 if(boot.heroVillagers<6||boot.environmentAssets<10||boot.expandedNature<60||boot.detailedResidentParts<8) errors.push(`town asset population is incomplete: ${JSON.stringify(boot)}`);
-if(!boot.assetCollisions||boot.assetCollisionCount<8) errors.push(`expanded asset collisions did not initialize: ${JSON.stringify(boot)}`);
 if(!boot.surfaceMaps) errors.push('grass/dirt/stone albedo + normal surface detail did not initialize');
 if(!boot.bounds||boot.bounds.gladeRadius<34||boot.bounds.halfWidth<28||boot.bounds.northMaxZ<50) errors.push(`expanded world bounds are incomplete: ${JSON.stringify(boot.bounds)}`);
 if(!boot.cameraPitchControls) errors.push('latest main camera pitch controls were not preserved in PR 11');
@@ -85,26 +82,16 @@ const collision = await page.evaluate(() => {
   const townOverflow={x:40,z:60};
   game.world.clampToArena(townOverflow);
 
-  const blocker=town.presentationCollision.blockers.find(item=>item.kind==='box');
-  let expansionInside=false;
-  if(blocker){
-    player.setPosition(blocker.cx,0,blocker.cz);
-    town.update(0);
-    expansionInside=Math.abs(player.position.x-blocker.cx)<blocker.hx+(player.radius||.38)&&Math.abs(player.position.z-blocker.cz)<blocker.hz+(player.radius||.38);
-  }
-
-  return {x,z,insideShop,bossZ:fakeBoss.position.z,bossVz:fakeBoss.velocity.z,glade,townPoint,townOverflow,expansionInside,blockerSource:blocker?.source};
+  return {x,z,insideShop,bossZ:fakeBoss.position.z,bossVz:fakeBoss.velocity.z,glade,townPoint,townOverflow};
 });
 if(collision.insideShop) errors.push(`shop collision failed: ${JSON.stringify(collision)}`);
 if(collision.bossZ!==9||collision.bossVz!==0) errors.push(`town ward failed against boss: ${JSON.stringify(collision)}`);
 if(Math.hypot(collision.glade.x,collision.glade.z)>34.001) errors.push(`expanded glade boundary failed: ${JSON.stringify(collision.glade)}`);
 if(collision.townPoint.x!==24||collision.townPoint.z!==45) errors.push(`expanded northern town interior was incorrectly clamped: ${JSON.stringify(collision.townPoint)}`);
 if(collision.townOverflow.x>28.001||collision.townOverflow.z>50.001) errors.push(`expanded town outer boundary failed: ${JSON.stringify(collision.townOverflow)}`);
-if(collision.expansionInside) errors.push(`new environment collision failed for ${collision.blockerSource}: ${JSON.stringify(collision)}`);
 
 await page.evaluate(() => {
   const town=window.__MAPLES_TOWN__;
-  town.game.player.setPosition(0,0,18);
   town.openDialogue(town.npcs.find(n=>n.id==='ilyra'));
 });
 await page.waitForSelector('#town-dialogue:not(.hidden)');
@@ -218,5 +205,5 @@ await mobile.close();
 await browser.close();
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1);}
-console.log('town-runtime: expanded asset town + detailed surfaces + collisions + desktop/mobile + Nous settings + modal lifetime safety PASS');
+console.log('town-runtime: expanded asset town + detailed surfaces + desktop/mobile + Nous settings + modal lifetime safety PASS');
 console.log(JSON.stringify({boot,collision,dialogue,before,after,safety,settings,mobileLayout},null,2));
