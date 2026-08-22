@@ -95,6 +95,44 @@ function hostileCanThreatenModal(town) {
   return false;
 }
 
+function installNous0xUi(town) {
+  const panel = town.ui?.settings;
+  if (!panel) return;
+  const title = panel.querySelector('header h2');
+  const subtitle = panel.querySelector('header p');
+  const labels = panel.querySelectorAll('.town-field > span');
+  const note = panel.querySelector('.town-security-note');
+  if (title) title.textContent = '0x Alpha';
+  if (subtitle) subtitle.textContent = 'Nous Portal-powered free-form NPC conversations.';
+  if (labels[0]) labels[0].textContent = 'Nous Portal API key';
+  if (labels[1]) labels[1].textContent = 'Model';
+  if (town.ui.aiModel) town.ui.aiModel.placeholder = 'auto:0x-alpha';
+  if (note) note.textContent = 'Your Nous key stays only in this browser tab session. Maples sends it over HTTPS to the same-origin relay only when you explicitly test or talk; the relay forwards that request to Nous Portal and never stores the key.';
+
+  const syncSettings = town._syncSettingsUI.bind(town);
+  town._syncSettingsUI = function syncNousSettings(message='') {
+    syncSettings(message);
+    if (!message) this.ui.aiStatus.textContent = this.ai.configured ? `Nous ready · ${this.ai.modelLabel}` : 'Local dialogue active.';
+  };
+
+  const testAI = town._testAI.bind(town);
+  town._testAI = async function testNousAI() {
+    await testAI();
+    if (this.ai.configured && this.ui.aiStatus.textContent.toLowerCase().startsWith('connected')) {
+      this.ui.aiStatus.textContent = `Connected · ${this.ai.modelLabel}`;
+    }
+  };
+
+  const refreshDialogue = town._refreshDialogueComposer.bind(town);
+  town._refreshDialogueComposer = function refreshNousDialogue() {
+    refreshDialogue();
+    if (this.ai.configured) this.ui.dialogueStatus.textContent = `Nous · ${this.ai.modelLabel}`;
+  };
+
+  town._syncSettingsUI();
+  town.__nous0xUi = true;
+}
+
 export function installTownRuntimeGuards(town) {
   if (!town || town.__runtimeGuardsInstalled) return town;
 
@@ -148,6 +186,7 @@ export function installTownRuntimeGuards(town) {
   };
 
   installAuthoredWorldBounds(town);
+  installNous0xUi(town);
 
   const updateTown = town.update.bind(town);
   town.update = function updateTownWithCollisions(dt) {
