@@ -5,6 +5,7 @@ import './narrow-hud-fix.css';
 import './premium-ui.css';
 import { Game } from './game/Game.js';
 import { enhanceInstance } from './game/Enhancements.js';
+import { installUnifiedActionArchitecture } from './game/UnifiedActionArchitecture.js';
 import { installAssetVisuals } from './game/AssetVisuals.js';
 import { installEnvironmentAssets } from './game/EnvironmentAssets.js';
 import { installNatureAssets } from './game/NatureAssets.js';
@@ -25,6 +26,7 @@ import { installCameraPitchControls } from './game/CameraPitchControls.js';
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
 enhanceInstance(game);
+installUnifiedActionArchitecture(game);
 
 const enterButton = document.querySelector('#enter-btn');
 enterButton.disabled = true;
