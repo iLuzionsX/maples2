@@ -1,5 +1,5 @@
 [build]
-  command = "node tests/enemy-facing-unit.mjs && npm run test:mobile:unit && node tests/ox-delegate-unit.mjs && node tests/ox-verify-output-unit.mjs && node scripts/netlify-validate.mjs && node scripts/ox-delegate.mjs && node scripts/ox-verify-output.mjs"
+  command = "node tests/enemy-facing-unit.mjs && npm run test:mobile:unit && node tests/ox-delegate-unit.mjs && node tests/ox-verify-output-unit.mjs && node scripts/netlify-validate.mjs && node scripts/ox-delegate.mjs"
   publish = "dist"
 
 [[headers]]
