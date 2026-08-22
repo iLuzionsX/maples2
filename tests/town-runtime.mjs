@@ -108,13 +108,23 @@ const safety = await page.evaluate(() => {
   player.setPosition(0,0,10.1);
   const wardEdgeBlocked=town.openSettings();
   const wardEdgeModal=town.modalOpen;
+  const dialogueBlocked=town.openDialogue(town.npcs.find(n=>n.id==='darran'));
+  const dialogueModal=town.modalOpen;
+  const shopBlocked=town.openShop('anvil');
+  const shopModal=town.modalOpen;
   game.enemies.pop();
 
   player.setPosition(0,0,18);
   const allowed=town.openSettings();
-  return {blocked,blockedModal,wardEdgeBlocked,wardEdgeModal,allowed,allowedModal:town.modalOpen};
+  return {blocked,blockedModal,wardEdgeBlocked,wardEdgeModal,dialogueBlocked,dialogueModal,shopBlocked,shopModal,allowed,allowedModal:town.modalOpen};
 });
-if(safety.blocked!==false||safety.blockedModal||safety.wardEdgeBlocked!==false||safety.wardEdgeModal||safety.allowed!==true||!safety.allowedModal) errors.push(`safe settings gate failed: ${JSON.stringify(safety)}`);
+if(
+  safety.blocked!==false||safety.blockedModal||
+  safety.wardEdgeBlocked!==false||safety.wardEdgeModal||
+  safety.dialogueBlocked!==false||safety.dialogueModal||
+  safety.shopBlocked!==false||safety.shopModal||
+  safety.allowed!==true||!safety.allowedModal
+) errors.push(`safe modal gate failed: ${JSON.stringify(safety)}`);
 
 await page.fill('#town-ai-key','sk-nous-test-session-only-1234567890');
 await page.check('#town-ai-enabled');
