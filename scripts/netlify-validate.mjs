@@ -47,6 +47,7 @@ const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--
 try {
   await ready();
   await run('node', [tempPath], 180000);
+  await run('node', ['tests/town-runtime.mjs'], 180000);
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
   fs.rmSync(tempPath, { force: true });
