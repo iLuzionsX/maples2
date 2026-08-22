@@ -29,7 +29,7 @@ const boot = await page.evaluate(() => {
     dynamicName:town.dynamic.name,
     arenaRadius:game.world.arenaRadius,
     starterCoins:town.coins,
-    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions),
+    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions&&town.__authoredWorldBounds),
     settingsVisible:Boolean(document.querySelector('#town-settings-btn')),
     interactVisible:Boolean(document.querySelector('#town-interact')),
     townObjects:town.root.children.length
@@ -53,10 +53,21 @@ const collision = await page.evaluate(() => {
   game.enemies.push(fakeBoss);
   town._protectTown();
   game.enemies.pop();
-  return {x,z,insideShop,bossZ:fakeBoss.position.z,bossVz:fakeBoss.velocity.z};
+
+  const glade={x:35,z:0};
+  game.world.clampToArena(glade);
+  const townPoint={x:15,z:32};
+  game.world.clampToArena(townPoint);
+  const townOverflow={x:30,z:40};
+  game.world.clampToArena(townOverflow);
+
+  return {x,z,insideShop,bossZ:fakeBoss.position.z,bossVz:fakeBoss.velocity.z,glade,townPoint,townOverflow};
 });
 if(collision.insideShop) errors.push(`shop collision failed: ${JSON.stringify(collision)}`);
 if(collision.bossZ!==9||collision.bossVz!==0) errors.push(`town ward failed against boss: ${JSON.stringify(collision)}`);
+if(Math.hypot(collision.glade.x,collision.glade.z)>28.001) errors.push(`glade boundary exposed outer ring: ${JSON.stringify(collision.glade)}`);
+if(collision.townPoint.x!==15||collision.townPoint.z!==32) errors.push(`authored town interior was incorrectly clamped: ${JSON.stringify(collision.townPoint)}`);
+if(collision.townOverflow.x>18.201||collision.townOverflow.z>33.151) errors.push(`town outer boundary failed: ${JSON.stringify(collision.townOverflow)}`);
 
 await page.evaluate(() => {
   const town=window.__MAPLES_TOWN__;
