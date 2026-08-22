@@ -56,9 +56,10 @@ export function pickNous0xAlphaModel(response) {
     const id = text(row?.id || row?.model || row?.name, 160);
     const haystack = [id, row?.name, row?.display_name, row?.description].filter(Boolean).join(' ');
     let score = 0;
-    if (/0x[\s/_:.-]*alpha/i.test(haystack)) score += 100;
-    if (/\b0x\b/i.test(haystack) && /alpha/i.test(haystack)) score += 70;
-    if (/0x/i.test(id) && /alpha/i.test(id)) score += 50;
+    if (/(?:0x|ox)[\s/_:.-]*alpha/i.test(haystack)) score += 100;
+    if (/\b(?:0x|ox)\b/i.test(haystack) && /alpha/i.test(haystack)) score += 70;
+    if (/(?:0x|ox)/i.test(id) && /alpha/i.test(id)) score += 50;
+    if (/^stealth\/ox-alpha$/i.test(id)) score += 30;
     if (/:free\b/i.test(id) || /\bfree\b/i.test(haystack)) score += 5;
     return { id, score };
   }).filter(item => item.id && item.score > 0);
