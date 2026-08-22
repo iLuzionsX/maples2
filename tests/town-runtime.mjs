@@ -29,7 +29,7 @@ const boot = await page.evaluate(() => {
     dynamicName:town.dynamic.name,
     arenaRadius:game.world.arenaRadius,
     starterCoins:town.coins,
-    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices),
+    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions),
     settingsVisible:Boolean(document.querySelector('#town-settings-btn')),
     interactVisible:Boolean(document.querySelector('#town-interact')),
     townObjects:town.root.children.length
@@ -43,6 +43,21 @@ if(!boot.runtimeGuards) errors.push('town runtime guards did not install');
 if(!boot.settingsVisible||!boot.interactVisible||boot.townObjects<20) errors.push('town UI/environment did not install completely');
 
 await page.locator('#enter-btn').click();
+const collision = await page.evaluate(() => {
+  const town=window.__MAPLES_TOWN__, game=window.__MAPLES_GAME__, player=game.player;
+  player.setPosition(-11.8,0,18.5);
+  town.update(0);
+  const x=player.position.x,z=player.position.z;
+  const insideShop=Math.abs(x+11.8)<3.03&&Math.abs(z-18.5)<2.68;
+  const fakeBoss={dead:false,isBoss:true,position:{z:12},velocity:{z:1}};
+  game.enemies.push(fakeBoss);
+  town._protectTown();
+  game.enemies.pop();
+  return {x,z,insideShop,bossZ:fakeBoss.position.z,bossVz:fakeBoss.velocity.z};
+});
+if(collision.insideShop) errors.push(`shop collision failed: ${JSON.stringify(collision)}`);
+if(collision.bossZ!==9||collision.bossVz!==0) errors.push(`town ward failed against boss: ${JSON.stringify(collision)}`);
+
 await page.evaluate(() => {
   const town=window.__MAPLES_TOWN__;
   town.openDialogue(town.npcs.find(n=>n.id==='ilyra'));
@@ -122,4 +137,4 @@ await browser.close();
 
 if(errors.length){console.error(errors.join('\n'));process.exit(1);}
 console.log('town-runtime: desktop + mobile PASS');
-console.log(JSON.stringify({boot,dialogue,before,after,safety,mobileLayout},null,2));
+console.log(JSON.stringify({boot,collision,dialogue,before,after,safety,mobileLayout},null,2));
