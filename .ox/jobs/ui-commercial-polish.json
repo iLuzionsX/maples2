@@ -1,0 +1,11 @@
+{
+  "id": "ui-mobile-hud-smoke",
+  "enabled": false,
+  "mode": "patch",
+  "task": "Make one restrained, production-quality improvement pass to this narrow/mobile HUD CSS for Maples. The goal is an expensive, intentional fantasy action-RPG HUD at 320-430px widths: calm hierarchy, no overlap, excellent touch readability, no unnecessary decoration, and no costly effects. Preserve existing selectors and behavior. OUTPUT CONTRACT: return only a canonical git-style unified diff for the supplied file. The first line must be exactly `diff --git a/src/narrow-hud-fix.css b/src/narrow-hud-fix.css`, followed by `--- a/src/narrow-hud-fix.css`, `+++ b/src/narrow-hud-fix.css`, and standard `@@ -old,+new @@` hunks. Do not use Markdown fences. Do not use `*** Begin Patch`, `*** Update File`, prose, commentary, renames, new files, or deleted files. If no safe improvement can be made, still return a valid no-op-free unified diff containing one genuine improvement.",
+  "files": [
+    "src/narrow-hud-fix.css"
+  ],
+  "model": "stealth/ox-alpha",
+  "max_tokens": 3000
+}
