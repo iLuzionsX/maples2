@@ -1,6 +1,9 @@
 [build]
-  command = "node tests/enemy-facing-unit.mjs && npm run test:mobile:unit && node scripts/netlify-validate.mjs"
+  command = "npm run test:town && node tests/enemy-facing-unit.mjs && npm run test:mobile:unit && node scripts/netlify-validate.mjs"
   publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
 
 [[headers]]
   for = "/*"
