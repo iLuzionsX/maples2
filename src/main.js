@@ -23,6 +23,7 @@ import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
 import { installLumenwoodTown } from './game/TownSystem.js';
 import { clearLumenwoodFootprint } from './game/TownFootprint.js';
+import { installTownPerformanceGuard } from './game/TownPerformance.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -66,7 +67,7 @@ function waitForCoreVisuals(timeoutMs = 15000) {
 
 Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(async () => {
   clearLumenwoodFootprint(game);
-  town = installLumenwoodTown(game);
+  town = installTownPerformanceGuard(installLumenwoodTown(game));
   window.__MAPLES_TOWN__ = town;
   if (performancePass) {
     performancePass.rebatch();
