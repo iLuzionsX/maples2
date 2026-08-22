@@ -21,9 +21,11 @@ import { installPerformancePass } from './game/PerformancePass.js';
 import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
+import { installCameraPitchControls } from './game/CameraPitchControls.js';
 import { installLumenwoodTown } from './game/TownSystem.js';
 import { clearLumenwoodFootprint } from './game/TownFootprint.js';
 import { installTownRuntimeGuards } from './game/TownRuntime.js';
+import { installTownPresentation } from './game/TownPresentation.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -47,6 +49,7 @@ const performanceDisabled = new URLSearchParams(location.search).get('perf') ===
 const performancePass = performanceDisabled ? null : installPerformancePass(game);
 const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
 installMobileCameraControls(game);
+installCameraPitchControls(game);
 let town = null;
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
@@ -68,6 +71,7 @@ function waitForCoreVisuals(timeoutMs = 15000) {
 Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(async () => {
   clearLumenwoodFootprint(game);
   town = installTownRuntimeGuards(installLumenwoodTown(game));
+  installTownPresentation(town);
   window.__MAPLES_TOWN__ = town;
   if (performancePass) {
     performancePass.rebatch();
