@@ -28,6 +28,7 @@ import { installTownRuntimeGuards } from './game/TownRuntime.js';
 import { installTownPresentation } from './game/TownPresentation.js';
 import { hideLegacyFlatTownSurfaces } from './game/TownSurfaceCleanup.js';
 import { installMosswakeBridge } from './game/MosswakeBridge.js';
+import { polishMosswakeBridge } from './game/MosswakeBridgePolish.js';
 import { installTownWorldBounds } from './game/TownWorldBounds.js';
 import { installTownExpansionCollisions } from './game/TownExpansionCollision.js';
 
@@ -78,6 +79,7 @@ Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).th
   hideLegacyFlatTownSurfaces(town);
   installTownPresentation(town);
   installMosswakeBridge(town);
+  polishMosswakeBridge(town);
   installTownWorldBounds(town);
   installTownExpansionCollisions(town);
   window.__MAPLES_TOWN__ = town;
