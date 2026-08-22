@@ -22,6 +22,7 @@ import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
 import { installLumenwoodTown } from './game/TownSystem.js';
+import { clearLumenwoodFootprint } from './game/TownFootprint.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -45,7 +46,7 @@ const performanceDisabled = new URLSearchParams(location.search).get('perf') ===
 const performancePass = performanceDisabled ? null : installPerformancePass(game);
 const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
 installMobileCameraControls(game);
-const town = installLumenwoodTown(game);
+let town = null;
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 
@@ -64,6 +65,9 @@ function waitForCoreVisuals(timeoutMs = 15000) {
 }
 
 Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(async () => {
+  clearLumenwoodFootprint(game);
+  town = installLumenwoodTown(game);
+  window.__MAPLES_TOWN__ = town;
   if (performancePass) {
     performancePass.rebatch();
     performanceExtensions?.freezeStaticDecor();
@@ -76,4 +80,3 @@ Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).th
 
 game.start();
 window.__MAPLES_GAME__ = game;
-window.__MAPLES_TOWN__ = town;
