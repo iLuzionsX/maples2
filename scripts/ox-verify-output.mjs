@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 const JOB_DIR = '.ox/jobs';
@@ -15,36 +16,68 @@ function cleanPath(value) {
   return normalized;
 }
 
-export function extractPatchPaths(output) {
-  const text = String(output ?? '').replace(/\r\n/g, '\n');
-  if (!text.trim()) throw new Error('Ox patch output is empty.');
-  if (/^```/m.test(text)) throw new Error('Ox patch output must not contain Markdown fences.');
-  if (/^GIT binary patch$/m.test(text) || /^Binary files /m.test(text)) throw new Error('Binary patches are not allowed.');
+export function normalizePatchOutput(output) {
+  let text = String(output ?? '').replace(/\r\n/g, '\n').trim();
+  if (!text) throw new Error('Ox patch output is empty.');
 
+  const fenced = text.match(/^```(?:diff|patch)?\s*\n([\s\S]*?)\n```$/i);
+  if (fenced) text = fenced[1].trim();
+
+  const gitStart = text.search(/^diff --git /m);
+  const unifiedStart = text.search(/^---\s+(?:a\/|[^\s])/m);
+  let start = -1;
+  if (gitStart >= 0) start = gitStart;
+  else if (unifiedStart >= 0) start = unifiedStart;
+  if (start < 0) throw new Error('Ox patch output is not a recognizable unified diff.');
+
+  text = text.slice(start).trim();
+  if (/^```/m.test(text)) throw new Error('Ox patch output contains an unexpected Markdown fence.');
+  if (/^GIT binary patch$/m.test(text) || /^Binary files /m.test(text)) throw new Error('Binary patches are not allowed.');
+  return `${text}\n`;
+}
+
+export function extractPatchPaths(output) {
+  const text = normalizePatchOutput(output);
   const paths = new Set();
-  let sawPatchHeader = false;
+  let sawHeader = false;
+  let sawHunk = false;
+  let pendingOld = '';
+
   for (const line of text.split('\n')) {
     const diff = line.match(/^diff --git a\/(.+) b\/(.+)$/);
     if (diff) {
-      sawPatchHeader = true;
+      sawHeader = true;
       const left = cleanPath(diff[1]);
       const right = cleanPath(diff[2]);
       if (!left || !right || left !== right) throw new Error(`Renames or invalid patch paths are not allowed: ${line}`);
       paths.add(right);
+      pendingOld = '';
       continue;
     }
-    const plus = line.match(/^\+\+\+\s+(.+)$/);
-    if (plus) {
-      sawPatchHeader = true;
-      const file = cleanPath(plus[1].split('\t')[0]);
-      if (!file) throw new Error(`New/deleted files are not allowed in delegated patches: ${line}`);
-      paths.add(file);
+
+    const minus = line.match(/^---\s+(.+?)(?:\t.*)?$/);
+    if (minus) {
+      sawHeader = true;
+      pendingOld = cleanPath(minus[1]);
+      if (!pendingOld) throw new Error(`New/deleted files are not allowed in delegated patches: ${line}`);
+      continue;
     }
+
+    const plus = line.match(/^\+\+\+\s+(.+?)(?:\t.*)?$/);
+    if (plus) {
+      sawHeader = true;
+      const next = cleanPath(plus[1]);
+      if (!next) throw new Error(`New/deleted files are not allowed in delegated patches: ${line}`);
+      if (pendingOld && pendingOld !== next) throw new Error(`Renames are not allowed: ${pendingOld} -> ${next}`);
+      paths.add(next);
+      pendingOld = '';
+      continue;
+    }
+
+    if (/^@@\s/.test(line)) sawHunk = true;
   }
 
-  if (!sawPatchHeader || !paths.size || !/^@@\s/m.test(text)) {
-    throw new Error('Ox patch output is not a recognizable unified diff.');
-  }
+  if (!sawHeader || !sawHunk || !paths.size) throw new Error('Ox patch output is not a recognizable unified diff.');
   return [...paths].sort();
 }
 
@@ -57,21 +90,42 @@ export function verifyPatchScope(job, output) {
   return changed;
 }
 
-export function verifyResult(job, result, commitRef = '') {
+export function verifyPatchApplies(output, rootDir = process.cwd()) {
+  const patch = normalizePatchOutput(output);
+  const result = spawnSync('git', ['apply', '--check', '--whitespace=nowarn', '-'], {
+    cwd: rootDir,
+    input: patch,
+    encoding: 'utf8',
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (result.error) throw new Error(`Unable to run git apply --check: ${result.error.message}`);
+  if (result.status !== 0) {
+    const detail = String(result.stderr || result.stdout || '').trim().replace(/\s+/g, ' ').slice(0, 500);
+    throw new Error(`Ox patch does not apply cleanly to the delegated checkout${detail ? `: ${detail}` : '.'}`);
+  }
+  return true;
+}
+
+export function verifyResult(job, result, commitRef = '', rootDir = '') {
   if (!result || typeof result !== 'object') throw new Error(`${job.id}: result JSON is invalid.`);
   if (result.id !== job.id) throw new Error(`${job.id}: result id mismatch.`);
   if (result.mode !== job.mode) throw new Error(`${job.id}: result mode mismatch.`);
-  const output = String(result.output ?? '').trim();
-  if (!output) throw new Error(`${job.id}: empty result output.`);
+  const rawOutput = String(result.output ?? '').trim();
+  if (!rawOutput) throw new Error(`${job.id}: empty result output.`);
 
+  const output = job.mode === 'patch' ? normalizePatchOutput(rawOutput) : rawOutput;
   const changedFiles = job.mode === 'patch' ? verifyPatchScope(job, output) : [];
+  if (job.mode === 'patch' && rootDir) verifyPatchApplies(output, rootDir);
+
   return {
     ...result,
+    output,
     verified: true,
     verified_at: new Date().toISOString(),
     input_commit: String(commitRef || ''),
     changed_files: changedFiles,
-    output_sha256: crypto.createHash('sha256').update(output).digest('hex')
+    output_sha256: crypto.createHash('sha256').update(output).digest('hex'),
+    normalized_output: output !== rawOutput
   };
 }
 
@@ -104,7 +158,7 @@ export function main(rootDir = process.cwd()) {
     const resultPath = path.join(outputDir, `${job.id}.json`);
     if (!fs.existsSync(resultPath)) throw new Error(`${job.id}: delegated result file is missing.`);
     const raw = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
-    const verified = verifyResult(job, raw, process.env.COMMIT_REF || '');
+    const verified = verifyResult(job, raw, process.env.COMMIT_REF || '', rootDir);
     fs.writeFileSync(resultPath, JSON.stringify(verified, null, 2));
     verifiedResults.push(verified);
     console.log(`OX VERIFY PASS: ${job.id} (${verified.output_sha256.slice(0, 12)})`);
@@ -124,6 +178,7 @@ export function main(rootDir = process.cwd()) {
       model: result.model,
       mode: result.mode,
       verified: result.verified,
+      changed_files: result.changed_files,
       output_sha256: result.output_sha256,
       file: `${result.id}.json`
     }))
