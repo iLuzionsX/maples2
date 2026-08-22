@@ -20,9 +20,10 @@ const job = {
 const patch = `diff --git a/src/narrow-hud-fix.css b/src/narrow-hud-fix.css
 --- a/src/narrow-hud-fix.css
 +++ b/src/narrow-hud-fix.css
-@@ -1 +1 @@
+@@ -1,2 +1,2 @@
 -.hud { gap: 4px; }
 +.hud { gap: 6px; }
+ .keep { color: white; }
 `;
 
 assert.deepEqual(extractPatchPaths(patch), ['src/narrow-hud-fix.css']);
