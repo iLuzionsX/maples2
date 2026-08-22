@@ -193,6 +193,16 @@ export function installTownRuntimeGuards(town) {
     return true;
   };
 
+  // While any blocking town panel owns input, freeze hostile AI/combat updates.
+  // The entry gate above prevents opening under immediate threat; this lifetime
+  // guard prevents an enemy from moving laterally along the ward and attacking
+  // after Rowan's movement and combat controls have already been cleared.
+  const updateEnemies = town.game._updateEnemies.bind(town.game);
+  town.game._updateEnemies = (...args) => {
+    if (town.modalOpen) return;
+    return updateEnemies(...args);
+  };
+
   // The gate ward is a true gameplay boundary, including the boss. Thornmaw
   // still spawns and fights normally in the southern glade but cannot be kited
   // through the populated square.
@@ -211,6 +221,10 @@ export function installTownRuntimeGuards(town) {
 
   const updateTown = town.update.bind(town);
   town.update = function updateTownWithCollisions(dt) {
+    if (this.game.started && this.modalOpen && !canOpenBlockingTownModal(this)) {
+      this.closePanels();
+      this.game.toast?.('A nearby threat interrupted the interaction.', 1.2);
+    }
     if (this.game.started) resolveTownCollisions(this);
     updateTown(dt);
   };
@@ -219,6 +233,7 @@ export function installTownRuntimeGuards(town) {
   town.__townCollisions = true;
   town.__authoredWorldBounds = true;
   town.__modalHostileSafety = true;
+  town.__modalCombatPause = true;
   town.__runtimeGuardsInstalled = true;
   return town;
 }
