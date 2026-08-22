@@ -78,9 +78,11 @@ Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).th
   town = installTownRuntimeGuards(installLumenwoodTown(game));
   hideLegacyFlatTownSurfaces(town);
   installTownPresentation(town);
+  const combatArenaRadius = game.world.arenaRadius;
   installMosswakeBridge(town);
   polishMosswakeBridge(town);
   installTownWorldBounds(town);
+  game.world.arenaRadius = combatArenaRadius;
   installTownExpansionCollisions(town);
   window.__MAPLES_TOWN__ = town;
   if (performancePass) {
