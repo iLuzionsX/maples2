@@ -8,6 +8,7 @@ const GLADE_RADIUS = 28;
 const TOWN_MIN_Z = 9.4;
 const TOWN_MAX_Z = 33.15;
 const TOWN_HALF_WIDTH = 18.2;
+const COLLISION_EPSILON = 0.002;
 
 // cx, cz, halfWidth, halfDepth. These stay deliberately simple and cheap:
 // town buildings are stylized box footprints and do not need a physics engine.
@@ -27,8 +28,8 @@ function pushOutAabb(position, cx, cz, halfX, halfZ, radius) {
   const px = halfX + radius - Math.abs(dx);
   const pz = halfZ + radius - Math.abs(dz);
   if (px <= 0 || pz <= 0) return false;
-  if (px < pz) position.x += (dx < 0 ? -1 : 1) * px;
-  else position.z += (dz < 0 ? -1 : 1) * pz;
+  if (px < pz) position.x += (dx < 0 ? -1 : 1) * (px + COLLISION_EPSILON);
+  else position.z += (dz < 0 ? -1 : 1) * (pz + COLLISION_EPSILON);
   return true;
 }
 
@@ -39,7 +40,7 @@ function pushOutCircle(position, cx, cz, combinedRadius) {
   if (d2 >= combinedRadius*combinedRadius) return false;
   if (d2 < 1e-8) { dx = 1; dz = 0; }
   const d = Math.sqrt(dx*dx + dz*dz);
-  const push = combinedRadius - d;
+  const push = combinedRadius - d + COLLISION_EPSILON;
   position.x += dx / d * push;
   position.z += dz / d * push;
   return true;
