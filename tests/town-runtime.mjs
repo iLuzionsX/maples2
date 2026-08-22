@@ -10,7 +10,7 @@ const browser = await chromium.launch({
 async function collect(page, label) {
   page.on('pageerror', error => errors.push(`${label} pageerror: ${error.message}`));
   page.on('console', message => {
-    if (message.type() === 'error' && !message.text().includes('favicon')) errors.push(`${label} console: ${message.text()}`));
+    if (message.type() === 'error' && !message.text().includes('favicon')) errors.push(`${label} console: ${message.text()}`);
   });
 }
 
