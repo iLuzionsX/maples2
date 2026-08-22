@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { NPCS, NPC_PLACEMENTS, SHOPS, fallbackLine, getNpc, getShop, isTownSafeZone } from '../src/game/TownData.js';
 import { clearLumenwoodFootprint } from '../src/game/TownFootprint.js';
-import { buildInstructions, extractOutputText } from '../netlify/functions/ai-dialogue.mjs';
+import { buildInstructions, extractOutputText, handler } from '../netlify/functions/ai-dialogue.mjs';
 
 assert.equal(SHOPS.length, 6, 'town should expose six distinct shops');
 assert.equal(NPCS.length, 16, 'town should have a substantial resident cast');
@@ -61,4 +61,18 @@ const output = extractOutputText({
 assert.equal(output, 'Lantern Square is quiet tonight.');
 assert.equal(extractOutputText({output:[]}), '');
 
-console.log(`town-ai-unit: ${NPCS.length} NPCs, ${SHOPS.length} shops, footprint + relay helpers PASS`);
+const missingOrigin = await handler({
+  httpMethod:'POST',
+  headers:{host:'maples.example'},
+  body:JSON.stringify({apiKey:'sk-test-session-only-1234567890',playerLine:'Hello'})
+});
+assert.equal(missingOrigin.statusCode,403,'relay must reject requests without a verified browser Origin');
+
+const missingKey = await handler({
+  httpMethod:'POST',
+  headers:{host:'maples.example',origin:'https://maples.example'},
+  body:JSON.stringify({playerLine:'Hello'})
+});
+assert.equal(missingKey.statusCode,400,'relay must never fall back to a server-owned provider key');
+
+console.log(`town-ai-unit: ${NPCS.length} NPCs, ${SHOPS.length} shops, footprint + BYOK relay guards PASS`);
