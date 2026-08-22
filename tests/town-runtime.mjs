@@ -29,7 +29,7 @@ const boot = await page.evaluate(() => {
     dynamicName:town.dynamic.name,
     arenaRadius:game.world.arenaRadius,
     starterCoins:town.coins,
-    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions&&town.__authoredWorldBounds),
+    runtimeGuards:Boolean(town.__runtimeGuardsInstalled&&town.__allocationStableMatrices&&town.__townCollisions&&town.__authoredWorldBounds&&town.__modalHostileSafety),
     settingsVisible:Boolean(document.querySelector('#town-settings-btn')),
     interactVisible:Boolean(document.querySelector('#town-interact')),
     townObjects:town.root.children.length
@@ -94,16 +94,24 @@ const after = await page.evaluate(() => ({coins:window.__MAPLES_TOWN__.coins,hp:
 if(before.wares!==2||after.coins!==before.coins-12||after.hp!==64) errors.push(`shop transaction failed: ${JSON.stringify({before,after})}`);
 
 const safety = await page.evaluate(() => {
-  const town=window.__MAPLES_TOWN__, player=window.__MAPLES_GAME__.player;
+  const town=window.__MAPLES_TOWN__, game=window.__MAPLES_GAME__, player=game.player;
   town.closePanels();
   player.setPosition(0,0,0);
   const blocked=town.openSettings();
   const blockedModal=town.modalOpen;
+
+  const wardHostile={dead:false,remove:false,isBoss:false,attackRange:1.45,position:{x:0,z:9}};
+  game.enemies.push(wardHostile);
+  player.setPosition(0,0,10.1);
+  const wardEdgeBlocked=town.openSettings();
+  const wardEdgeModal=town.modalOpen;
+  game.enemies.pop();
+
   player.setPosition(0,0,18);
   const allowed=town.openSettings();
-  return {blocked,blockedModal,allowed,allowedModal:town.modalOpen};
+  return {blocked,blockedModal,wardEdgeBlocked,wardEdgeModal,allowed,allowedModal:town.modalOpen};
 });
-if(safety.blocked!==false||safety.blockedModal||safety.allowed!==true||!safety.allowedModal) errors.push(`safe settings gate failed: ${JSON.stringify(safety)}`);
+if(safety.blocked!==false||safety.blockedModal||safety.wardEdgeBlocked!==false||safety.wardEdgeModal||safety.allowed!==true||!safety.allowedModal) errors.push(`safe settings gate failed: ${JSON.stringify(safety)}`);
 
 await page.fill('#town-ai-key','sk-test-session-only-1234567890');
 await page.fill('#town-ai-model','gpt-5.6');
