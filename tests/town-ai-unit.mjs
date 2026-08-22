@@ -58,10 +58,15 @@ assert.equal(extractChatText({choices:[]}), '');
 
 const discovered = pickNous0xAlphaModel({data:[
   {id:'meta/llama-4-scout:free',name:'Llama 4 Scout'},
-  {id:'nousresearch/0x-alpha:free',name:'0x Alpha'},
+  {id:'stealth/ox-alpha',name:'0x Alpha'},
   {id:'other/alpha-model',name:'Alpha'}
 ]});
-assert.equal(discovered,'nousresearch/0x-alpha:free','0x Alpha discovery should prefer the matching Nous catalog entry');
+assert.equal(discovered,'stealth/ox-alpha','0x Alpha discovery should prefer the current stealth/ox-alpha catalog entry');
+assert.equal(
+  pickNous0xAlphaModel({data:[{id:'nous/0x-alpha:free',name:'0x Alpha'}]}),
+  'nous/0x-alpha:free',
+  'discovery should tolerate a zero-x alias if Nous changes the catalog slug'
+);
 assert.equal(pickNous0xAlphaModel({data:[{id:'other/model'}]}),'','discovery should not silently substitute another model');
 
 const missingOrigin = await handler({
