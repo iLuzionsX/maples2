@@ -27,6 +27,7 @@ import { clearLumenwoodFootprint } from './game/TownFootprint.js';
 import { installTownRuntimeGuards } from './game/TownRuntime.js';
 import { installTownPresentation } from './game/TownPresentation.js';
 import { hideLegacyFlatTownSurfaces } from './game/TownSurfaceCleanup.js';
+import { installMosswakeBridge } from './game/MosswakeBridge.js';
 import { installTownExpansionCollisions } from './game/TownExpansionCollision.js';
 
 const canvas = document.querySelector('#game');
@@ -75,6 +76,7 @@ Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).th
   town = installTownRuntimeGuards(installLumenwoodTown(game));
   hideLegacyFlatTownSurfaces(town);
   installTownPresentation(town);
+  installMosswakeBridge(town);
   installTownExpansionCollisions(town);
   window.__MAPLES_TOWN__ = town;
   if (performancePass) {
