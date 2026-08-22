@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { NPCS, NPC_PLACEMENTS, SHOPS, fallbackLine, getNpc, getShop, isTownSafeZone } from '../src/game/TownData.js';
 import { clearLumenwoodFootprint } from '../src/game/TownFootprint.js';
-import { buildInstructions, extractOutputText, handler } from '../netlify/functions/ai-dialogue.mjs';
+import { buildInstructions, extractChatText, handler, pickNous0xAlphaModel } from '../netlify/functions/ai-dialogue.mjs';
 
 assert.equal(SHOPS.length, 6, 'town should expose six distinct shops');
 assert.equal(NPCS.length, 16, 'town should have a substantial resident cast');
@@ -52,19 +52,22 @@ assert.match(instructions, /Stay in character/);
 assert.match(instructions, /Never invent a mechanical reward/);
 assert.match(instructions, /Sella/);
 
-const output = extractOutputText({
-  output: [
-    {type:'reasoning',content:[]},
-    {type:'message',content:[{type:'output_text',text:'Lantern Square is quiet tonight.'}]}
-  ]
-});
-assert.equal(output, 'Lantern Square is quiet tonight.');
-assert.equal(extractOutputText({output:[]}), '');
+assert.equal(extractChatText({choices:[{message:{content:'Lantern Square is quiet tonight.'}}]}), 'Lantern Square is quiet tonight.');
+assert.equal(extractChatText({choices:[{message:{content:[{type:'text',text:'The ward is holding.'}]}}]}), 'The ward is holding.');
+assert.equal(extractChatText({choices:[]}), '');
+
+const discovered = pickNous0xAlphaModel({data:[
+  {id:'meta/llama-4-scout:free',name:'Llama 4 Scout'},
+  {id:'nousresearch/0x-alpha:free',name:'0x Alpha'},
+  {id:'other/alpha-model',name:'Alpha'}
+]});
+assert.equal(discovered,'nousresearch/0x-alpha:free','0x Alpha discovery should prefer the matching Nous catalog entry');
+assert.equal(pickNous0xAlphaModel({data:[{id:'other/model'}]}),'','discovery should not silently substitute another model');
 
 const missingOrigin = await handler({
   httpMethod:'POST',
   headers:{host:'maples.example'},
-  body:JSON.stringify({apiKey:'sk-test-session-only-1234567890',playerLine:'Hello'})
+  body:JSON.stringify({apiKey:'sk-nous-test-session-only-1234567890',playerLine:'Hello'})
 });
 assert.equal(missingOrigin.statusCode,403,'relay must reject requests without a verified browser Origin');
 
@@ -75,4 +78,4 @@ const missingKey = await handler({
 });
 assert.equal(missingKey.statusCode,400,'relay must never fall back to a server-owned provider key');
 
-console.log(`town-ai-unit: ${NPCS.length} NPCs, ${SHOPS.length} shops, footprint + BYOK relay guards PASS`);
+console.log(`town-ai-unit: ${NPCS.length} NPCs, ${SHOPS.length} shops, footprint + Nous 0x Alpha BYOK guards PASS`);
