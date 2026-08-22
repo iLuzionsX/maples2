@@ -1,5 +1,6 @@
 const SETTINGS_KEY = 'maples.ai.settings.v1';
 const SESSION_KEY = 'maples.ai.key.v1';
+const DEFAULT_MODEL = 'auto:0x-alpha';
 
 function safeStorage(storage, method, ...args) {
   try { return storage?.[method]?.(...args); } catch { return null; }
@@ -10,7 +11,7 @@ export function loadAISettings() {
   try { saved = JSON.parse(safeStorage(localStorage, 'getItem', SETTINGS_KEY) || '{}'); } catch {}
   return {
     enabled: Boolean(saved.enabled),
-    model: typeof saved.model === 'string' && saved.model.trim() ? saved.model.trim() : 'gpt-5.6',
+    model: typeof saved.model === 'string' && saved.model.trim() && saved.model !== 'gpt-5.6' ? saved.model.trim() : DEFAULT_MODEL,
     apiKey: safeStorage(sessionStorage, 'getItem', SESSION_KEY) || ''
   };
 }
@@ -18,7 +19,7 @@ export function loadAISettings() {
 export function saveAISettings(settings) {
   const normalized = {
     enabled: Boolean(settings.enabled),
-    model: String(settings.model || 'gpt-5.6').trim().slice(0, 80) || 'gpt-5.6',
+    model: String(settings.model || DEFAULT_MODEL).trim().slice(0, 120) || DEFAULT_MODEL,
     apiKey: String(settings.apiKey || '').trim()
   };
   safeStorage(localStorage, 'setItem', SETTINGS_KEY, JSON.stringify({ enabled: normalized.enabled, model: normalized.model }));
@@ -34,10 +35,14 @@ export function clearAIKey() {
 export class CloudAIClient {
   constructor() {
     this.settings = loadAISettings();
+    this.resolvedModel = '';
   }
 
   configure(next) {
+    const previousKey = this.settings.apiKey;
+    const previousModel = this.settings.model;
     this.settings = saveAISettings({ ...this.settings, ...next });
+    if (previousKey !== this.settings.apiKey || previousModel !== this.settings.model) this.resolvedModel = '';
     return this.settings;
   }
 
@@ -45,8 +50,12 @@ export class CloudAIClient {
     return this.settings.enabled && this.settings.apiKey.length >= 20;
   }
 
+  get modelLabel() {
+    return this.resolvedModel || (this.settings.model === DEFAULT_MODEL ? '0x Alpha · auto' : this.settings.model);
+  }
+
   async test() {
-    if (!this.configured) throw new Error('Add an API key and enable Cloud AI first.');
+    if (!this.configured) throw new Error('Add a Nous Portal API key and enable Cloud AI first.');
     return this._request({
       test: true,
       npc: { name: 'Lumenwood relay', role: 'connection test', personality: '', knowledge: '' },
@@ -74,12 +83,13 @@ export class CloudAIClient {
         body: JSON.stringify({
           ...payload,
           apiKey: this.settings.apiKey,
-          model: this.settings.model
+          model: this.resolvedModel || this.settings.model
         })
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || `Cloud AI request failed (${response.status}).`);
       if (!data.text || typeof data.text !== 'string') throw new Error('Cloud AI returned no dialogue.');
+      if (typeof data.model === 'string' && data.model.trim()) this.resolvedModel = data.model.trim();
       return data.text.trim();
     } catch (error) {
       if (error?.name === 'AbortError') throw new Error('Cloud AI timed out. Local dialogue is still available.');
