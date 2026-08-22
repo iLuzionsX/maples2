@@ -1,0 +1,77 @@
+import { chromium } from 'playwright';
+
+const baseUrl = process.env.MAPLES_TEST_BASE_URL || 'http://127.0.0.1:4173';
+const errors = [];
+const browser = await chromium.launch({
+  headless:true,
+  args:['--no-sandbox','--disable-setuid-sandbox','--use-gl=swiftshader','--enable-webgl','--ignore-gpu-blocklist']
+});
+const page = await browser.newPage({ viewport:{width:1280,height:720} });
+page.on('pageerror',error=>errors.push(`pageerror: ${error.message}`));
+page.on('console',message=>{if(message.type()==='error'&&!message.text().includes('favicon')) errors.push(`console: ${message.text()}`);});
+
+await page.goto(baseUrl,{waitUntil:'networkidle'});
+await page.waitForFunction(()=>Boolean(window.__MAPLES_GAME__&&window.__MAPLES_TOWN__));
+await page.waitForFunction(()=>document.querySelector('#enter-btn')?.dataset.ready==='true',null,{timeout:90000});
+await page.locator('#enter-btn').click();
+
+const result = await page.evaluate(() => {
+  const town=window.__MAPLES_TOWN__;
+  const game=window.__MAPLES_GAME__;
+  const player=game.player;
+  const state=town.bridgeApproach;
+
+  const glade={x:35,z:0};
+  const south={x:40,z:-80};
+  const north={x:45,z:80};
+  game.world.clampToArena(glade);
+  game.world.clampToArena(south);
+  game.world.clampToArena(north);
+
+  const waterBlocker=state?.blockers?.find(blocker=>blocker.cx>0);
+  player.setPosition(waterBlocker?.cx||8,0,waterBlocker?.cz||6.45);
+  town.update(0);
+  const afterWater={x:player.position.x,z:player.position.z};
+  const radius=player.radius||.38;
+  const stillInWater=waterBlocker
+    ? Math.abs(afterWater.x-waterBlocker.cx)<waterBlocker.hx+radius&&Math.abs(afterWater.z-waterBlocker.cz)<waterBlocker.hz+radius
+    : true;
+
+  const bridgeZ=waterBlocker?.cz||6.45;
+  player.setPosition(0,0,bridgeZ);
+  town.update(0);
+  const bridgeCenter={x:player.position.x,z:player.position.z};
+
+  return {
+    ready:Boolean(state?.ready&&town.__mosswakeBridge&&town.__largerWorldApproach),
+    deck:state?.deck?.length||0,
+    storyScenery:state?.storyScenery?.length||0,
+    nature:state?.nature?.length||0,
+    storyMarker:state?.storyMarker?.name||null,
+    waterName:state?.water?.name||null,
+    blockers:state?.blockers?.length||0,
+    bounds:state?.bounds||null,
+    presentationBounds:town.presentation?.bounds||null,
+    arenaRadius:game.world.arenaRadius,
+    glade,south,north,
+    stillInWater,
+    bridgeCenter,
+    waterPushes:state?.waterPushes||0
+  };
+});
+
+await browser.close();
+if(!result.ready) errors.push(`Mosswake Bridge did not initialize: ${JSON.stringify(result)}`);
+if(result.deck<13||result.storyScenery<6||result.nature<16) errors.push(`bridge/world asset population incomplete: ${JSON.stringify(result)}`);
+if(result.storyMarker!=='MosswakeBridgeStoryMarker'||result.waterName!=='BlackbriarRunWater'||result.blockers!==2) errors.push(`bridge environmental story layer incomplete: ${JSON.stringify(result)}`);
+if(!result.bounds||result.bounds.southMinZ>-62||result.bounds.northMaxZ<68||result.bounds.northHalfWidth<36) errors.push(`larger world bounds incomplete: ${JSON.stringify(result.bounds)}`);
+if(!result.presentationBounds||result.presentationBounds.southMinZ>-62||result.presentationBounds.northMaxZ<68) errors.push(`presentation did not inherit larger bounds: ${JSON.stringify(result.presentationBounds)}`);
+if(result.arenaRadius<68) errors.push(`arena metadata did not expand: ${result.arenaRadius}`);
+if(Math.hypot(result.glade.x,result.glade.z)>34.001) errors.push(`combat glade boundary regressed: ${JSON.stringify(result.glade)}`);
+if(result.south.x>26.001||result.south.z<-62.001) errors.push(`southern approach boundary failed: ${JSON.stringify(result.south)}`);
+if(result.north.x>36.001||result.north.z>68.001) errors.push(`northern outskirts boundary failed: ${JSON.stringify(result.north)}`);
+if(result.stillInWater||result.waterPushes<1) errors.push(`Blackbriar Run did not force the bridge crossing: ${JSON.stringify(result)}`);
+if(Math.abs(result.bridgeCenter.x)>.05||Math.abs(result.bridgeCenter.z-(result.bounds?6.45:6.45))>.08) errors.push(`bridge center was incorrectly blocked: ${JSON.stringify(result.bridgeCenter)}`);
+if(errors.length){console.error(errors.join('\n'));process.exit(1);}
+console.log('MOSSWAKE BRIDGE APPROACH PASS');
+console.log(JSON.stringify(result,null,2));
