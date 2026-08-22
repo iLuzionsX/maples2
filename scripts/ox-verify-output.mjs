@@ -110,10 +110,10 @@ export function verifyResult(job, result, commitRef = '', rootDir = '') {
   if (!result || typeof result !== 'object') throw new Error(`${job.id}: result JSON is invalid.`);
   if (result.id !== job.id) throw new Error(`${job.id}: result id mismatch.`);
   if (result.mode !== job.mode) throw new Error(`${job.id}: result mode mismatch.`);
-  const rawOutput = String(result.output ?? '').trim();
-  if (!rawOutput) throw new Error(`${job.id}: empty result output.`);
+  const originalOutput = String(result.output ?? '').replace(/\r\n/g, '\n');
+  if (!originalOutput.trim()) throw new Error(`${job.id}: empty result output.`);
 
-  const output = job.mode === 'patch' ? normalizePatchOutput(rawOutput) : rawOutput;
+  const output = job.mode === 'patch' ? normalizePatchOutput(originalOutput) : originalOutput.trim();
   const changedFiles = job.mode === 'patch' ? verifyPatchScope(job, output) : [];
   if (job.mode === 'patch' && rootDir) verifyPatchApplies(output, rootDir);
 
@@ -125,7 +125,7 @@ export function verifyResult(job, result, commitRef = '', rootDir = '') {
     input_commit: String(commitRef || ''),
     changed_files: changedFiles,
     output_sha256: crypto.createHash('sha256').update(output).digest('hex'),
-    normalized_output: output !== rawOutput
+    normalized_output: output !== originalOutput
   };
 }
 
