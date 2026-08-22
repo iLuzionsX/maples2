@@ -4,6 +4,10 @@ import { isTownSafeZone } from './TownData.js';
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
 const WALLET_KEY = 'maples.town.coins.v1';
 const STARTER_COINS = 75;
+const GLADE_RADIUS = 28;
+const TOWN_MIN_Z = 9.4;
+const TOWN_MAX_Z = 33.15;
+const TOWN_HALF_WIDTH = 18.2;
 
 // cx, cz, halfWidth, halfDepth. These stay deliberately simple and cheap:
 // town buildings are stylized box footprints and do not need a physics engine.
@@ -43,8 +47,9 @@ function pushOutCircle(position, cx, cz, combinedRadius) {
 
 function resolveTownCollisions(town) {
   const player = town.game.player;
+  if (!player) return;
   const position = player.position;
-  if (!player || position.z < 9.4 || Math.abs(position.x) > 19.8) return;
+  if (position.z < TOWN_MIN_Z || Math.abs(position.x) > 19.8) return;
   const radius = player.radius || .38;
 
   // Two passes handle corners where resolving one blocker enters another.
@@ -55,6 +60,23 @@ function resolveTownCollisions(town) {
 
   // Residents remain tangible without expensive rigid-body simulation.
   for (const npc of town.npcs) pushOutCircle(position,npc.position.x,npc.position.z,.38+radius);
+}
+
+function installAuthoredWorldBounds(town) {
+  const world = town.game.world;
+  world.clampToArena = function clampToGladeOrTown(position) {
+    if (position.z > TOWN_MIN_Z) {
+      position.x = THREE.MathUtils.clamp(position.x, -TOWN_HALF_WIDTH, TOWN_HALF_WIDTH);
+      position.z = Math.min(position.z, TOWN_MAX_Z);
+      return;
+    }
+    const distance = Math.hypot(position.x, position.z);
+    if (distance > GLADE_RADIUS) {
+      const scale = GLADE_RADIUS / distance;
+      position.x *= scale;
+      position.z *= scale;
+    }
+  };
 }
 
 export function installTownRuntimeGuards(town) {
@@ -108,6 +130,8 @@ export function installTownRuntimeGuards(town) {
     }
   };
 
+  installAuthoredWorldBounds(town);
+
   const updateTown = town.update.bind(town);
   town.update = function updateTownWithCollisions(dt) {
     if (this.game.started) resolveTownCollisions(this);
@@ -116,6 +140,7 @@ export function installTownRuntimeGuards(town) {
 
   town.__allocationStableMatrices = true;
   town.__townCollisions = true;
+  town.__authoredWorldBounds = true;
   town.__runtimeGuardsInstalled = true;
   return town;
 }
