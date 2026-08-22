@@ -1,0 +1,15 @@
+{
+  "id": "ui-commercial-polish",
+  "enabled": true,
+  "mode": "patch",
+  "task": "Act as the lead product/UI designer-engineer for Maples, an original stylized fantasy Three.js browser action-RPG targeting an X-worthy commercial-indie showcase. Make a restrained but visibly high-impact UI polish pass using only the supplied files. The existing direction should feel expensive, intentional, modern, tactile, and fantasy-specific rather than generic game HUD or programmer UI. Prioritize hierarchy, typography, spacing, panel treatment, HUD readability, interaction states, and mobile ergonomics. Keep the screen visually calm: reduce unnecessary chrome/noise instead of adding decoration. Preserve every existing DOM id/class/selector contract and all gameplay behavior. Do not modify JavaScript logic. Do not require new external assets, fonts, packages, or network dependencies. Maintain accessibility, safe-area behavior, touch targets, reduced-motion support, and strong readability over a moving 3D scene. Pay special attention to 320-430px phone widths so HUD/action controls do not overlap or become cumbersome. Avoid expensive CSS effects that could materially hurt game FPS. Return a production-ready unified diff only. Prefer improving the existing design system rather than layering on a second conflicting one.",
+  "files": [
+    "index.html",
+    "src/style.css",
+    "src/premium-ui.css",
+    "src/narrow-hud-fix.css",
+    "src/showcase.css"
+  ],
+  "model": "auto:ox-alpha",
+  "max_tokens": 32000
+}
