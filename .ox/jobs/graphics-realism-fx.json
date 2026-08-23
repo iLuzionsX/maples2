@@ -1,14 +1,12 @@
 {
   "id": "graphics-realism-fx",
-  "enabled": true,
+  "enabled": false,
   "mode": "patch",
   "reasoning_effort": "medium",
-  "task": "Independently upgrade Maples' FX.js for a commercial-indie graphics A/B. Replace programmer-art-looking hard geometric particles with convincing layered sparks, soft spell energy, mist, embers and restrained physical debris while preserving every existing public method and call signature. Keep combat readable and grounded rather than neon-heavy. Use only existing Three.js/browser capabilities, no dependencies or external assets. Avoid large per-frame allocations, excessive lights, or significant draw-call growth; keep mobile/low quality efficient. Return ONLY a concise clean unified diff for FX.js.",
+  "task": "Legacy direct FX rewrite job retained for history. Replaced by the isolated OxGraphicsPass A/B job so the Ox variant is independent and reliable.",
   "files": [
     "src/game/FX.js"
   ],
   "model": "stealth/ox-alpha",
-  "max_tokens": 5000,
-  "request_timeout_ms": 240000,
-  "max_attempts": 2
+  "max_tokens": 5000
 }
