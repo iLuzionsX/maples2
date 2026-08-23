@@ -1,0 +1,15 @@
+{
+  "id": "graphics-realism-ab",
+  "enabled": true,
+  "mode": "patch",
+  "reasoning_effort": "high",
+  "task": "Act as an independent senior real-time graphics/VFX designer-engineer for Maples, an original stylized fantasy Three.js browser action-RPG targeting an X-worthy commercial-indie showcase. Make the game look materially more realistic and expensive while preserving its current fantasy identity, gameplay, camera, animation, UI contracts, encounter logic, asset pipeline, mobile support and performance work. Focus on the highest-visible gains: physically grounded lighting/exposure/fog/shadow balance, atmospheric depth, terrain/material read, and especially particle/VFX quality. Replace programmer-art-looking hard geometric particles with softer layered sparks, dust, embers, spell energy, mist or debris where appropriate. Keep combat readable; do not turn everything into bloom or neon. Preserve the existing ShowcasePass water, bridge, environment composition, boss presentation and combat timing. Use only Three.js/browser primitives already available in the repo; no new dependencies, external URLs, assets, DOM requirements or gameplay mechanics. Avoid large per-frame allocations, excessive dynamic lights, huge draw-call increases, or effects likely to hurt mobile FPS. High quality can receive restrained extra polish, while low quality should stay efficient. You may edit only the supplied existing files. Return ONLY a clean unified diff that applies to the supplied checkout.",
+  "files": [
+    "src/game/FX.js",
+    "src/game/Game.js",
+    "src/game/World.js",
+    "src/game/ShowcasePass.js"
+  ],
+  "model": "stealth/ox-alpha",
+  "max_tokens": 20000
+}
