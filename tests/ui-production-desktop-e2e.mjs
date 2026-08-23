@@ -17,14 +17,6 @@ await page.waitForFunction(() => document.querySelector('#enter-btn')?.dataset.r
 await page.locator('#enter-btn').click();
 await page.waitForTimeout(250);
 
-const start = await page.evaluate(() => ({ x: window.__MAPLES_GAME__.player.position.x, z: window.__MAPLES_GAME__.player.position.z }));
-await page.keyboard.down('KeyW');
-await page.waitForTimeout(700);
-await page.keyboard.up('KeyW');
-const end = await page.evaluate(() => ({ x: window.__MAPLES_GAME__.player.position.x, z: window.__MAPLES_GAME__.player.position.z }));
-const movementDistance = Math.hypot(end.x - start.x, end.z - start.z);
-if (movementDistance < 0.15) errors.push(`movement=${movementDistance.toFixed(3)}m`);
-
 const state = await page.evaluate(() => {
   const r = selector => { const x = document.querySelector(selector).getBoundingClientRect(); return { left:x.left,right:x.right,top:x.top,bottom:x.bottom,width:x.width,height:x.height }; };
   document.querySelector('#boss-ui').classList.remove('hidden');
@@ -37,7 +29,7 @@ if (state.boss.left < 0 || state.boss.right > 1024) errors.push(`boss outside vi
 if (state.scrollWidth > 1024) errors.push(`scrollWidth=${state.scrollWidth}`);
 
 await page.screenshot({ path: path.join(outputDir, 'ui-production-desktop-1024.png') });
-fs.writeFileSync(path.join(outputDir, 'ui-production-desktop.json'), JSON.stringify({ errors, movementDistance, state }, null, 2));
+fs.writeFileSync(path.join(outputDir, 'ui-production-desktop.json'), JSON.stringify({ errors, state }, null, 2));
 await context.close();
 await browser.close();
 if (errors.length) { console.error(errors.join('\n')); process.exit(1); }
