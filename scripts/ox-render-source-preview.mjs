@@ -34,7 +34,13 @@ if (result.verified !== true || result.mode !== 'source-rewrite') throw new Erro
 if (JSON.stringify(result.changed_files) !== JSON.stringify(['src/game/OxGraphicsPass.js'])) throw new Error('Ox source result changed unexpected files.');
 if (!/export\s+function\s+installOxGraphicsPass\s*\(/.test(result.output)) throw new Error('Ox source export contract is missing.');
 
-const syntax = spawnSync(process.execPath, ['--check', '-'], { input: result.output, encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 });
+// Check generated source as an ES module. `node --check -` parses stdin as
+// CommonJS and incorrectly rejects valid `import ... from 'three'` syntax.
+const syntaxPath = path.join(root, '.ox', '.OxGraphicsPass.generated-check.mjs');
+fs.mkdirSync(path.dirname(syntaxPath), { recursive: true });
+fs.writeFileSync(syntaxPath, result.output);
+const syntax = spawnSync(process.execPath, ['--check', syntaxPath], { encoding: 'utf8', maxBuffer: 2 * 1024 * 1024 });
+fs.rmSync(syntaxPath, { force: true });
 if (syntax.error || syntax.status !== 0) {
   throw new Error(`Ox source syntax check failed: ${String(syntax.stderr || syntax.stdout || syntax.error?.message || '').trim().slice(0,1000)}`);
 }
