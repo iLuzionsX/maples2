@@ -1,0 +1,14 @@
+{
+  "id": "graphics-realism-showcase",
+  "enabled": true,
+  "mode": "patch",
+  "reasoning_effort": "medium",
+  "task": "Independently polish Maples' ShowcasePass.js for a commercial-indie graphics A/B. Improve renderer/light balance, atmospheric depth, material/ground read and existing combat presentation where the largest visible gains exist. Preserve the stream, bridge, boss timing, camera, UI, gameplay, assets and performance contracts. Do not turn the scene into excessive bloom or neon. Use only existing Three.js/browser capabilities, no dependencies or external assets. Prefer a focused additive/refinement patch over a rewrite; avoid large per-frame allocations, excessive dynamic lights or significant draw-call growth and keep mobile/low quality efficient. Return ONLY a concise clean unified diff for ShowcasePass.js.",
+  "files": [
+    "src/game/ShowcasePass.js"
+  ],
+  "model": "stealth/ox-alpha",
+  "max_tokens": 5000,
+  "request_timeout_ms": 240000,
+  "max_attempts": 2
+}
