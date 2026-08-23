@@ -36,7 +36,7 @@ await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
 const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'inherit', env, shell: false, detached: true });
 try {
   await ready();
-  await run('node', ['tests/ui-production-e2e.mjs'], 240000);
+  await run('node', ['tests/ui-production-desktop-e2e.mjs'], 180000);
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
 }
