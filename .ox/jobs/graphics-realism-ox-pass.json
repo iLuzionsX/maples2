@@ -7,7 +7,7 @@
   "files": [
     "src/game/OxGraphicsPass.js"
   ],
-  "model": "auto:ox-alpha",
+  "model": "stealth/ox-alpha",
   "max_tokens": 1500,
   "request_timeout_ms": 120000,
   "max_attempts": 2
