@@ -1,4 +1,3 @@
-import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
 const baseUrl = 'http://127.0.0.1:4173';
@@ -32,23 +31,12 @@ async function ready() {
   throw new Error('preview unavailable');
 }
 
-// Temporary binary isolation: execute the unchanged Rowan browser test through
-// all boot + deterministic locomotion assertions, stopping before combat.
-const source = fs.readFileSync('tests/rowan-animation-e2e.mjs', 'utf8');
-const marker = 'const combat = await page.evaluate';
-const markerIndex = source.indexOf(marker);
-if (markerIndex < 0) throw new Error('Could not isolate Rowan locomotion section');
-const tempPath = 'tests/.rowan-locomotion-after-rig-fix.mjs';
-fs.writeFileSync(tempPath, `${source.slice(0, markerIndex)}\nawait context.close();\nawait browser.close();\nif (errors.length) { console.error(errors.join('\\n')); process.exit(1); }\nconsole.log('ROWAN LOCOMOTION ASSERTIONS PASS');\n`);
-
 await run('npm', ['run', 'build'], 90000);
 await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
 const preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], { stdio: 'inherit', env, shell: false, detached: true });
 try {
   await ready();
-  await run('node', [tempPath], 180000);
   await run('node', ['tests/ui-production-e2e.mjs'], 240000);
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
-  fs.rmSync(tempPath, { force: true });
 }
