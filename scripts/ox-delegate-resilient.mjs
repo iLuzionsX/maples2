@@ -9,6 +9,7 @@ import {
   validateEnabledJobs,
   validateJob,
 } from './ox-delegate.mjs';
+import { verifyResult } from './ox-verify-output.mjs';
 
 const NOUS_BASE_URL = 'https://inference-api.nousresearch.com/v1';
 const AUTO_MODEL = 'auto:ox-alpha';
@@ -43,9 +44,16 @@ export function resilientConfig(raw = {}) {
 
 export function isRetryableOxError(error) {
   if (!error) return false;
-  if (error.name === 'AbortError' || error.name === 'TimeoutError' || error.name === 'TypeError') return true;
+  if (error.name === 'AbortError' || error.name === 'TimeoutError' || error.name === 'TypeError' || error.name === 'OxOutputError') return true;
   const status = Number(error.status || 0);
   return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+class OxOutputError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'OxOutputError';
+  }
 }
 
 class OxHttpError extends Error {
@@ -158,7 +166,7 @@ async function runJob(job, config, rootDir, apiKey) {
     );
     try {
       const streamed = await oneAttempt(job, config, messages, model, apiKey, attempt);
-      return {
+      const candidate = {
         id: job.id,
         model: streamed.model,
         mode: job.mode,
@@ -168,6 +176,12 @@ async function runJob(job, config, rootDir, apiKey) {
         attempts: attempt,
         output: streamed.text,
       };
+      try {
+        verifyResult(job, candidate, process.env.COMMIT_REF || '', rootDir);
+      } catch (error) {
+        throw new OxOutputError(`Verifier rejected Ox output: ${clean(error?.message || error, 1000)}`);
+      }
+      return candidate;
     } catch (error) {
       const timedOut = error?.name === 'AbortError';
       const message = timedOut
