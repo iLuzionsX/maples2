@@ -16,7 +16,7 @@
 /* Keep the desktop combat centerline clear when side HUD modules are still wide. */
 @media (min-width: 761px) and (max-width: 1180px) and (pointer: fine) {
   .boss-ui {
-    top: 118px;
+    top: 148px;
     width: min(520px, 56vw);
   }
 }
