@@ -2,12 +2,12 @@
   "id": "graphics-realism-ab",
   "enabled": true,
   "mode": "patch",
-  "reasoning_effort": "high",
-  "task": "Act as an independent senior real-time graphics/VFX designer-engineer for Maples, an original stylized fantasy Three.js browser action-RPG targeting an X-worthy commercial-indie showcase. Make the visible presentation materially more realistic and expensive while preserving its stylized fantasy identity and all gameplay contracts. Concentrate only on these two existing presentation files. In FX.js, replace programmer-art-looking hard geometric particles with convincing layered sparks, soft energy, mist, embers and restrained physical debris while preserving every public method and call signature. In ShowcasePass.js, improve the existing renderer/light balance, atmospheric depth, ground/air detail and combat VFX where the biggest visual gains exist; preserve the stream, bridge, boss presentation, combat timing, camera, UI, assets and performance systems. Do not turn the scene into excessive bloom/neon. Use only Three.js/browser primitives already present; no new dependencies, external URLs/assets, DOM requirements or gameplay mechanics. Avoid large per-frame allocations, excessive dynamic lights, or significant draw-call inflation. Keep low-quality/mobile efficient. Return ONLY a clean unified diff that applies to the supplied checkout.",
+  "reasoning_effort": "medium",
+  "task": "Independently polish Maples' real-time graphics/VFX for a commercial-indie A/B. Preserve every gameplay contract and the current stylized fantasy direction. In FX.js, replace hard programmer-art particles with softer layered sparks, spell energy, mist, embers and restrained debris while preserving all method signatures. In ShowcasePass.js, improve renderer/light balance, atmospheric depth and combat VFX without changing the stream, bridge, boss timing, camera, UI, assets or gameplay. Keep effects grounded rather than neon-heavy. Use only existing Three.js/browser capabilities, no dependencies or external assets. Avoid significant draw-call/per-frame-allocation growth and keep low-quality/mobile efficient. Return ONLY a clean unified diff for the supplied files.",
   "files": [
     "src/game/FX.js",
     "src/game/ShowcasePass.js"
   ],
   "model": "stealth/ox-alpha",
-  "max_tokens": 12000
+  "max_tokens": 8000
 }
