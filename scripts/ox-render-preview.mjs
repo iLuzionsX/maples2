@@ -4,10 +4,17 @@ import { spawn, spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
 
 const root = process.cwd();
+const jobPath = path.join(root, '.ox', 'jobs', 'ui-ux-production-pass.json');
 const oxDir = path.join(root, 'dist', '__ox');
 const resultPath = path.join(oxDir, 'ui-ux-production-pass.json');
 const baseUrl = 'http://127.0.0.1:4173';
 const captureDir = path.join(root, 'dist', '__captures');
+
+const configuredJob = fs.existsSync(jobPath) ? JSON.parse(fs.readFileSync(jobPath, 'utf8')) : null;
+if (!configuredJob?.enabled) {
+  console.log('OX RENDER SKIP: ui-ux-production-pass job is disabled');
+  process.exit(0);
+}
 
 if (!fs.existsSync(resultPath)) throw new Error('Verified Ox result is missing.');
 const result = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
@@ -15,6 +22,7 @@ if (result.verified !== true) throw new Error('Ox result was not verifier-approv
 if (JSON.stringify(result.changed_files) !== JSON.stringify(['src/premium-ui.css'])) {
   throw new Error(`Unexpected Ox patch scope: ${JSON.stringify(result.changed_files)}`);
 }
+if (!['patch', 'css-override'].includes(result.mode)) throw new Error(`Unsupported render mode: ${result.mode}`);
 
 const preservedOx = new Map();
 for (const name of fs.readdirSync(oxDir)) {
@@ -50,17 +58,31 @@ async function ready() {
   throw new Error('Preview server did not become ready.');
 }
 
-function applyPatch(reverse = false) {
-  const args = ['apply', '--whitespace=nowarn'];
-  if (reverse) args.push('-R');
-  args.push('-');
-  const applied = spawnSync('git', args, {
-    cwd: root,
-    input: result.output,
-    encoding: 'utf8',
-    maxBuffer: 4 * 1024 * 1024,
-  });
-  if (applied.status !== 0) throw new Error(String(applied.stderr || applied.stdout || 'git apply failed').trim());
+let originalCss = null;
+const cssPath = path.join(root, 'src', 'premium-ui.css');
+
+function applyResult(reverse = false) {
+  if (result.mode === 'patch') {
+    const args = ['apply', '--whitespace=nowarn'];
+    if (reverse) args.push('-R');
+    args.push('-');
+    const applied = spawnSync('git', args, {
+      cwd: root,
+      input: result.output,
+      encoding: 'utf8',
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    if (applied.status !== 0) throw new Error(String(applied.stderr || applied.stdout || 'git apply failed').trim());
+    return;
+  }
+
+  if (!reverse) {
+    originalCss = fs.readFileSync(cssPath, 'utf8');
+    const base = originalCss.replace(/\s+$/, '');
+    fs.writeFileSync(cssPath, `${base}\n\n/* Ox Alpha verifier-approved CSS override */\n${result.output}`);
+  } else if (originalCss !== null) {
+    fs.writeFileSync(cssPath, originalCss);
+  }
 }
 
 async function waitForGame(page) {
@@ -69,16 +91,19 @@ async function waitForGame(page) {
   await page.waitForFunction(() => document.querySelector('#enter-btn')?.dataset.ready === 'true', null, { timeout: 90000 });
 }
 
-let patchApplied = false;
+let resultApplied = false;
 let preview;
 let browser;
 try {
-  applyPatch(false);
-  patchApplied = true;
+  applyResult(false);
+  resultApplied = true;
 
   await run('npm', ['run', 'build'], 90000);
   fs.mkdirSync(path.join(root, 'dist', '__ox'), { recursive: true });
   for (const [name, data] of preservedOx) fs.writeFileSync(path.join(root, 'dist', '__ox', name), data);
+  if (result.mode === 'css-override') {
+    fs.writeFileSync(path.join(root, 'dist', '__ox', 'verified-css-override.css'), result.output);
+  }
 
   await run('npx', ['playwright-core', 'install', 'chromium'], 300000);
   preview = spawn('npm', ['run', 'preview', '--', '--host', '127.0.0.1', '--port', '4173'], {
@@ -136,6 +161,8 @@ try {
   const meta = {
     generated_at: new Date().toISOString(),
     ox_model: result.model,
+    reasoning_effort: result.reasoning_effort,
+    mode: result.mode,
     input_commit: result.input_commit,
     output_sha256: result.output_sha256,
     changed_files: result.changed_files,
@@ -146,7 +173,7 @@ try {
     ],
   };
   fs.writeFileSync(path.join(captureDir, 'meta.json'), JSON.stringify(meta, null, 2));
-  fs.writeFileSync(path.join(captureDir, 'index.html'), `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ox Alpha UI Capture</title><style>body{margin:0;background:#07100f;color:#f5efdf;font:15px system-ui;padding:24px}main{max-width:1320px;margin:auto}h1{font-size:22px}p{color:#a9b7ad}.shot{margin:24px 0 36px}.shot h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#d9bb72}.shot img{display:block;max-width:100%;height:auto;border:1px solid rgba(217,187,114,.35);border-radius:12px;box-shadow:0 16px 45px #0008}code{word-break:break-all}</style><main><h1>Maples — Ox Alpha UI render</h1><p>Verifier-approved patch: <code>${result.output_sha256}</code></p><div class="shot"><h2>Desktop gameplay · 1280×720</h2><img src="ox-desktop-gameplay.png"></div><div class="shot"><h2>Desktop boss · 1280×720</h2><img src="ox-desktop-boss.png"></div><div class="shot"><h2>Mobile gameplay · 390×844</h2><img src="ox-mobile-gameplay.png"></div></main>`);
+  fs.writeFileSync(path.join(captureDir, 'index.html'), `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ox Alpha UI Capture</title><style>body{margin:0;background:#07100f;color:#f5efdf;font:15px system-ui;padding:24px}main{max-width:1320px;margin:auto}h1{font-size:22px}p{color:#a9b7ad}.shot{margin:24px 0 36px}.shot h2{font-size:14px;letter-spacing:.08em;text-transform:uppercase;color:#d9bb72}.shot img{display:block;max-width:100%;height:auto;border:1px solid rgba(217,187,114,.35);border-radius:12px;box-shadow:0 16px 45px #0008}code{word-break:break-all}</style><main><h1>Maples — Ox Alpha UI render</h1><p>Verifier-approved ${result.mode}: <code>${result.output_sha256}</code></p><div class="shot"><h2>Desktop gameplay · 1280×720</h2><img src="ox-desktop-gameplay.png"></div><div class="shot"><h2>Desktop boss · 1280×720</h2><img src="ox-desktop-boss.png"></div><div class="shot"><h2>Mobile gameplay · 390×844</h2><img src="ox-mobile-gameplay.png"></div></main>`);
 
   console.log(`OX RENDER PASS: ${result.output_sha256}`);
 } finally {
@@ -154,7 +181,7 @@ try {
   if (preview) {
     try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
   }
-  if (patchApplied) {
-    try { applyPatch(true); } catch {}
+  if (resultApplied) {
+    try { applyResult(true); } catch {}
   }
 }
