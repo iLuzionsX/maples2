@@ -1,0 +1,13 @@
+{
+  "id": "graphics-realism-ab",
+  "enabled": false,
+  "mode": "patch",
+  "reasoning_effort": "medium",
+  "task": "Legacy combined graphics A/B job retained for history. Replaced by independently sharded FX and Showcase jobs so Ox inference can run concurrently within Netlify build limits.",
+  "files": [
+    "src/game/FX.js",
+    "src/game/ShowcasePass.js"
+  ],
+  "model": "stealth/ox-alpha",
+  "max_tokens": 8000
+}

@@ -1,0 +1,14 @@
+{
+  "id": "graphics-realism-ox-pass",
+  "enabled": true,
+  "mode": "source-rewrite",
+  "reasoning_effort": "low",
+  "task": "You are the independent visual director for the B side of an A/B test. Author a SAFE, compact, visibly different production-quality graphics pass inside OxGraphicsPass.js only. Preserve ALL gameplay, camera, UI, combat, animation and asset behavior. Use ONLY these stable operations: (1) tune game.renderer.toneMappingExposure; (2) traverse game.scene and modestly tune existing HemisphereLight and DirectionalLight intensity/color/shadow bias without replacing lights; (3) tune existing scene fog color/density if present; (4) create one restrained THREE.Points atmospheric layer for dust/spores/mist using BufferGeometry + PointsMaterial, fewer points on game.quality==='low'; (5) wrap game.world.update by calling the original first and then animate that particle layer with simple rotation/opacity only, with no per-frame object allocations. Do NOT wrap or replace game.fx methods. Do NOT touch player/enemies, combat, camera, UI, composer passes, assets, DOM, network, dependencies, or gameplay state. Do NOT use external textures. Use only THREE primitives in this file. Choose your own colors, counts, exposure, fog and motion to make the scene feel more realistic, cinematic and expensive rather than neon. Keep the whole file concise and robust. Return ONLY the complete replacement JavaScript source for src/game/OxGraphicsPass.js, with no Markdown and no prose.",
+  "files": [
+    "src/game/OxGraphicsPass.js"
+  ],
+  "model": "stealth/ox-alpha",
+  "max_tokens": 1500,
+  "request_timeout_ms": 120000,
+  "max_attempts": 2
+}

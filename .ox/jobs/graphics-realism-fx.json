@@ -1,0 +1,12 @@
+{
+  "id": "graphics-realism-fx",
+  "enabled": false,
+  "mode": "patch",
+  "reasoning_effort": "medium",
+  "task": "Legacy direct FX rewrite job retained for history. Replaced by the isolated OxGraphicsPass A/B job so the Ox variant is independent and reliable.",
+  "files": [
+    "src/game/FX.js"
+  ],
+  "model": "stealth/ox-alpha",
+  "max_tokens": 5000
+}
