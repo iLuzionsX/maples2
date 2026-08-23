@@ -2,13 +2,13 @@
   "id": "graphics-realism-ox-pass",
   "enabled": true,
   "mode": "patch",
-  "reasoning_effort": "medium",
-  "task": "You are the independent visual director for the B side of an A/B test. Author a focused production-quality graphics/VFX pass inside OxGraphicsPass.js only. Make Maples look more realistic and expensive while preserving its stylized fantasy identity and ALL gameplay behavior. Use the documented game contracts in the file. Prioritize: more grounded lighting/exposure/fog depth; atmospheric dust/spores/mist with restrained counts; richer contact/ground feel; and layered combat particles that feel like sparks, embers, soft energy and physical debris rather than hard programmer-art geometry. You may wrap existing game.fx public methods but must preserve their signatures and call the original behavior where appropriate. Do not add dependencies, external URLs/assets, DOM requirements, gameplay mechanics, camera changes, or UI changes. Keep low/mobile quality efficient and avoid excessive dynamic lights, bloom, per-frame allocations, and draw-call growth. Make real visible changes, not comments. Return ONLY a concise clean unified diff for src/game/OxGraphicsPass.js.",
+  "reasoning_effort": "low",
+  "task": "You are the independent visual director for the B side of an A/B test. Author a compact production-quality graphics/VFX pass inside OxGraphicsPass.js only. Make Maples look more realistic and expensive while preserving its stylized fantasy identity and ALL gameplay behavior. Use the documented game contracts in the file. Prioritize grounded lighting/fog depth, restrained atmospheric dust/spores/mist, and layered combat sparks/embers/soft energy/debris instead of hard programmer-art geometry. You may wrap existing game.fx methods but preserve every signature and original behavior. No dependencies, external assets/URLs, DOM requirements, gameplay, camera, or UI changes. Keep mobile efficient and avoid excessive lights, bloom, allocations, and draw calls. Make visible code changes. Keep the implementation concise. Return ONLY a clean unified diff for src/game/OxGraphicsPass.js.",
   "files": [
     "src/game/OxGraphicsPass.js"
   ],
-  "model": "stealth/ox-alpha",
-  "max_tokens": 3200,
-  "request_timeout_ms": 210000,
+  "model": "auto:ox-alpha",
+  "max_tokens": 2200,
+  "request_timeout_ms": 150000,
   "max_attempts": 2
 }
