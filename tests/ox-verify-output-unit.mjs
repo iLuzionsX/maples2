@@ -5,7 +5,9 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
   extractPatchPaths,
+  normalizeCssOverrideOutput,
   normalizePatchOutput,
+  verifyCssOverrideScope,
   verifyPatchApplies,
   verifyPatchScope,
   verifyResult
@@ -58,6 +60,30 @@ try {
 } finally {
   fs.rmSync(temp, { recursive: true, force: true });
 }
+
+const cssJob = { id: 'css-pass', mode: 'css-override', files: ['src/premium-ui.css'] };
+const cssOverride = `.topbar { width: min(304px, calc(100vw - 32px)); }
+@media (max-width: 430px) {
+  .mobile-btn { min-width: 52px; min-height: 52px; }
+}
+`;
+assert.equal(normalizeCssOverrideOutput(`\`\`\`css\n${cssOverride}\`\`\``), cssOverride);
+assert.deepEqual(verifyCssOverrideScope(cssJob, cssOverride), ['src/premium-ui.css']);
+const verifiedCss = verifyResult(cssJob, {
+  id: 'css-pass',
+  mode: 'css-override',
+  model: 'stealth/ox-alpha',
+  reasoning_effort: 'high',
+  files: ['src/premium-ui.css'],
+  output: cssOverride
+}, 'css123');
+assert.equal(verifiedCss.verified, true);
+assert.deepEqual(verifiedCss.changed_files, ['src/premium-ui.css']);
+assert.equal(verifiedCss.reasoning_effort, 'high');
+assert.throws(() => normalizeCssOverrideOutput('@import "evil.css";\n.a { color: red; }'), /@import/);
+assert.throws(() => normalizeCssOverrideOutput('.a { background: url(https://example.com/a.png); }'), /URLs/);
+assert.throws(() => normalizeCssOverrideOutput('.a { color: red;'), /structurally valid|unbalanced/);
+assert.throws(() => verifyCssOverrideScope({ id: 'bad', mode: 'css-override', files: ['a.css', 'b.css'] }, '.a { color: red; }'), /exactly one/);
 
 const review = verifyResult({ id: 'review', mode: 'review', files: ['src/style.css'] }, {
   id: 'review',

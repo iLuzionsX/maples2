@@ -9,6 +9,8 @@ const OUTPUT_DIR = 'dist/__ox';
 const MAX_FILE_BYTES = 1_500_000;
 const MAX_TOTAL_BYTES = 6_000_000;
 const REQUEST_TIMEOUT_MS = 600_000;
+const REASONING_EFFORTS = new Set(['low', 'medium', 'high']);
+const MODES = new Set(['patch', 'review', 'css-override']);
 
 function cleanText(value, max = 20_000) {
   return String(value ?? '').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').trim().slice(0, max);
@@ -127,8 +129,17 @@ export function validateJob(raw, fileName = 'job.json') {
   if (!/^[a-zA-Z0-9._:/-]+$/.test(model)) throw new Error(`${fileName}: invalid model`);
   const maxTokens = Number.isFinite(Number(raw.max_tokens)) ? Math.trunc(Number(raw.max_tokens)) : 24_000;
   if (maxTokens < 256 || maxTokens > 64_000) throw new Error(`${fileName}: max_tokens must be 256..64000`);
-  const mode = raw.mode === 'review' ? 'review' : 'patch';
-  return { id, enabled: raw.enabled === true, task, files, model, maxTokens, mode };
+
+  const mode = cleanText(raw.mode || 'patch', 32).toLowerCase();
+  if (!MODES.has(mode)) throw new Error(`${fileName}: unsupported mode ${mode}`);
+  if (mode === 'css-override' && (files.length !== 1 || !files[0].toLowerCase().endsWith('.css'))) {
+    throw new Error(`${fileName}: css-override mode requires exactly one .css file`);
+  }
+
+  const reasoningEffort = cleanText(raw.reasoning_effort || 'low', 16).toLowerCase();
+  if (!REASONING_EFFORTS.has(reasoningEffort)) throw new Error(`${fileName}: reasoning_effort must be low, medium, or high`);
+
+  return { id, enabled: raw.enabled === true, task, files, model, maxTokens, mode, reasoningEffort };
 }
 
 export function validateEnabledJobs(jobs) {
@@ -163,9 +174,14 @@ export function readJobFiles(job, rootDir = process.cwd()) {
 }
 
 export function buildMessages(job, files) {
-  const outputRule = job.mode === 'review'
-    ? 'Return a concise engineering review with concrete findings, risks, and exact recommended changes. Do not pretend to have run tests.'
-    : 'Return ONLY a valid unified diff that can be applied from the repository root. Do not wrap the diff in Markdown fences. Preserve unrelated behavior.';
+  let outputRule;
+  if (job.mode === 'review') {
+    outputRule = 'Return a concise engineering review with concrete findings, risks, and exact recommended changes. Do not pretend to have run tests.';
+  } else if (job.mode === 'css-override') {
+    outputRule = 'Return ONLY a CSS override block for the single selected CSS file. Do not wrap it in Markdown fences. Do not return a git diff, prose, HTML, JavaScript, @import, or url(). Prefer additive overrides that preserve existing selectors and behavior.';
+  } else {
+    outputRule = 'Return ONLY a valid unified diff that can be applied from the repository root. Do not wrap the diff in Markdown fences. Preserve unrelated behavior.';
+  }
   const system = [
     'You are a senior software engineer delegated a tightly scoped task in the Maples Three.js browser action-RPG.',
     'Treat the supplied repository files as authoritative. Do not invent APIs or files you were not shown unless the task explicitly requires creating a new file.',
@@ -209,7 +225,7 @@ async function runJob(job, rootDir, apiKey) {
       body: JSON.stringify({
         model,
         messages,
-        reasoning_effort: 'low',
+        reasoning_effort: job.reasoningEffort,
         include_reasoning: false,
         max_tokens: job.maxTokens,
         stream: true,
@@ -232,6 +248,7 @@ async function runJob(job, rootDir, apiKey) {
       id: job.id,
       model: cleanText(streamed.model || model, 160),
       mode: job.mode,
+      reasoning_effort: job.reasoningEffort,
       files: job.files,
       created_at: new Date().toISOString(),
       output: text
@@ -283,7 +300,7 @@ export async function main(rootDir = process.cwd()) {
     const result = await runJob(job, rootDir, apiKey);
     const outputPath = path.join(outputDir, `${job.id}.json`);
     fs.writeFileSync(outputPath, JSON.stringify(result, null, 2));
-    index.push({ id: result.id, model: result.model, mode: result.mode, file: `${result.id}.json` });
+    index.push({ id: result.id, model: result.model, mode: result.mode, reasoning_effort: result.reasoning_effort, file: `${result.id}.json` });
     console.log(`OX DELEGATION PASS: ${job.id} -> ${path.relative(rootDir, outputPath)}`);
   }
   fs.writeFileSync(path.join(outputDir, 'index.json'), JSON.stringify({ jobs: index }, null, 2));

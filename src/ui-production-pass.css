@@ -1,0 +1,135 @@
+/*
+  Reviewed HUD production pass
+  ----------------------------
+  Additive refinements derived from the verifier-approved Ox Alpha UI direction.
+  This file is intentionally imported after premium-ui.css so narrow-screen,
+  interaction, and medium-desktop fixes cannot be shadowed by earlier layers.
+*/
+
+:root {
+  --ui-safe-top: max(12px, calc(env(safe-area-inset-top) + 8px));
+  --ui-safe-left: max(12px, calc(env(safe-area-inset-left) + 8px));
+  --ui-safe-right: max(12px, calc(env(safe-area-inset-right) + 8px));
+  --ui-safe-bottom: max(14px, calc(env(safe-area-inset-bottom) + 10px));
+}
+
+/* Keep the desktop combat centerline clear when side HUD modules are still wide. */
+@media (min-width: 761px) and (max-width: 1180px) and (pointer: fine) {
+  .boss-ui {
+    top: 148px;
+    width: min(520px, 56vw);
+  }
+}
+
+/* HP is the one value players must be able to read instantly in combat. */
+.bar.hp b {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .01em;
+}
+
+/* Remove perpetual ornamental movement from the hotbar. */
+.skill-icon::after {
+  animation: none !important;
+}
+
+/* Keyboard/gamepad-adjacent accessibility without changing the visual language. */
+button:focus-visible,
+.mobile-actions button:focus-visible {
+  outline: 2px solid var(--ui-brass-hot);
+  outline-offset: 3px;
+  border-color: rgba(240, 216, 149, .72) !important;
+  box-shadow:
+    0 0 0 3px rgba(217, 187, 114, .14),
+    0 10px 28px rgba(0, 0, 0, .30),
+    inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+
+/* Mobile: give notches and rounded corners breathing room rather than sitting on the inset. */
+@media (max-width: 760px), (pointer: coarse) and (max-width: 1024px) {
+  .topbar {
+    left: var(--ui-safe-left);
+    top: var(--ui-safe-top);
+  }
+
+  .quest {
+    right: var(--ui-safe-right);
+    top: var(--ui-safe-top);
+  }
+
+  .boss-ui {
+    top: calc(var(--ui-safe-top) + 72px);
+  }
+
+  .combo {
+    left: var(--ui-safe-left);
+    top: calc(var(--ui-safe-top) + 76px);
+  }
+
+  .joystick {
+    left: max(18px, calc(env(safe-area-inset-left) + 12px));
+    bottom: max(22px, calc(env(safe-area-inset-bottom) + 16px));
+  }
+
+  .mobile-actions {
+    right: max(16px, calc(env(safe-area-inset-right) + 12px));
+    bottom: max(18px, calc(env(safe-area-inset-bottom) + 14px));
+  }
+
+  .mobile-actions button {
+    min-width: 52px;
+    min-height: 52px;
+  }
+
+  .quest-progress {
+    font-size: 8px;
+  }
+}
+
+/* 320-360px phones need explicit room between the two top modules. */
+@media (max-width: 360px) {
+  .topbar {
+    width: min(160px, calc(55vw - 12px));
+  }
+
+  .quest {
+    width: min(120px, calc(39vw - 8px));
+  }
+
+  .name-row strong {
+    max-width: 68px;
+  }
+
+  .mobile-actions {
+    right: max(10px, calc(env(safe-area-inset-right) + 8px));
+  }
+
+  .joystick {
+    left: max(10px, calc(env(safe-area-inset-left) + 8px));
+  }
+}
+
+/* Landscape mobile keeps the same safe breathing room without growing the controls. */
+@media (max-height: 500px) and (pointer: coarse) {
+  .topbar,
+  .quest {
+    top: max(8px, calc(env(safe-area-inset-top) + 6px));
+  }
+
+  .boss-ui {
+    top: calc(max(8px, calc(env(safe-area-inset-top) + 6px)) + 61px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skill-icon::after,
+  .topbar::before,
+  .quest::before {
+    animation: none !important;
+  }
+
+  .mobile-actions button,
+  .skill {
+    transition-duration: .001ms !important;
+  }
+}

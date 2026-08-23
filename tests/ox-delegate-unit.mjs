@@ -51,7 +51,23 @@ const job = validateJob({
   max_tokens: 32000
 });
 assert.equal(job.mode, 'patch');
+assert.equal(job.reasoningEffort, 'low');
 assert.equal(job.maxTokens, 32000);
+
+const cssJob = validateJob({
+  id: 'hud-css-pass',
+  enabled: true,
+  mode: 'css-override',
+  reasoning_effort: 'high',
+  task: 'Improve the premium HUD with safe additive CSS overrides.',
+  files: ['src/premium-ui.css'],
+  max_tokens: 8000
+});
+assert.equal(cssJob.mode, 'css-override');
+assert.equal(cssJob.reasoningEffort, 'high');
+assert.throws(() => validateJob({ id: 'bad-css', mode: 'css-override', task: 'x', files: ['src/a.css', 'src/b.css'] }), /exactly one \.css file/);
+assert.throws(() => validateJob({ id: 'bad-reasoning', reasoning_effort: 'maximum', task: 'x', files: ['src/a.css'] }), /reasoning_effort/);
+assert.throws(() => validateJob({ id: 'bad-mode', mode: 'rewrite-anything', task: 'x', files: ['src/a.css'] }), /unsupported mode/);
 assert.throws(() => validateJob({ task: 'x', files: ['../secret'] }), /valid file path/);
 assert.throws(() => validateJob({ id: 'index', task: 'x', files: ['src/game/Game.js'] }), /reserved/);
 assert.throws(() => validateEnabledJobs([job, { ...job, id: 'COMBAT-PASS' }]), /Duplicate enabled Ox job id/);
@@ -69,6 +85,12 @@ try {
   assert.match(messages[0].content, /unified diff/i);
   assert.match(messages[1].content, /FILE: src\/game\/Game\.js/);
   assert.match(messages[1].content, /Fix combat timing/);
+
+  fs.mkdirSync(path.join(temp, 'src'), { recursive: true });
+  fs.writeFileSync(path.join(temp, 'src', 'premium-ui.css'), '.hud { color: white; }\n');
+  const cssMessages = buildMessages(cssJob, readJobFiles(cssJob, temp));
+  assert.match(cssMessages[0].content, /CSS override block/i);
+  assert.doesNotMatch(cssMessages[0].content, /valid unified diff/i);
 
   fs.writeFileSync(path.join(outside, 'secret.txt'), 'NOUS_API_KEY=must-not-leak\n');
   const symlinkPath = path.join(temp, 'src', 'game', 'LinkedSecret.txt');

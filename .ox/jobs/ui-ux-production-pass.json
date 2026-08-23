@@ -1,0 +1,12 @@
+{
+  "id": "ui-ux-production-pass",
+  "enabled": false,
+  "mode": "css-override",
+  "reasoning_effort": "high",
+  "task": "Act as the independent lead UI/UX designer-engineer for Maples, an original stylized fantasy Three.js browser action-RPG targeting an X-worthy commercial-indie showcase. The supplied src/premium-ui.css is the authoritative final UI layer and the ONLY file you may affect. Return a concise additive CSS override block only; do not return a git diff or rewrite the entire file. Preserve the strongest Lumenwood direction: smoked obsidian, forged brass, forest energy, pale parchment text, restrained ember accents. Make the HUD feel expensive, intentional, tactile, readable and game-native rather than generic web UI. Prioritize immediate health/resource/ability readability, cleaner hierarchy and spacing, strong contrast over a moving 3D world, robust desktop composition, mobile ergonomics at 320-430px, 44px+ touch targets, safe-area breathing room, deliberate focus/active states, reduced-motion support, and effects that do not materially hurt FPS. Pay special attention to medium-width desktop boss/HUD collision risk, narrow-phone top-module separation, selector robustness, safe-area offsets, and eliminating unnecessary infinite decorative motion. Preserve gameplay-facing selectors and contracts. Do not invent DOM, JavaScript requirements, dependencies, assets, @import rules, url() resources, or gameplay mechanics. Output ONLY the CSS override block, with no Markdown fence or prose.",
+  "files": [
+    "src/premium-ui.css"
+  ],
+  "model": "stealth/ox-alpha",
+  "max_tokens": 8000
+}

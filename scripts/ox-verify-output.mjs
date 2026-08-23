@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 const JOB_DIR = '.ox/jobs';
 const OUTPUT_DIR = 'dist/__ox';
+const MAX_CSS_OVERRIDE_BYTES = 200_000;
 
 function cleanPath(value) {
   const raw = String(value ?? '').trim().replace(/^['"]|['"]$/g, '').replace(/\\/g, '/');
@@ -33,6 +34,42 @@ export function normalizePatchOutput(output) {
   text = text.slice(start).trim();
   if (/^```/m.test(text)) throw new Error('Ox patch output contains an unexpected Markdown fence.');
   if (/^GIT binary patch$/m.test(text) || /^Binary files /m.test(text)) throw new Error('Binary patches are not allowed.');
+  return `${text}\n`;
+}
+
+function cssStructuralText(text) {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/"(?:\\.|[^"\\])*"/g, '')
+    .replace(/'(?:\\.|[^'\\])*'/g, '');
+}
+
+export function normalizeCssOverrideOutput(output) {
+  let text = String(output ?? '').replace(/\r\n/g, '\n').trim();
+  if (!text) throw new Error('Ox CSS override output is empty.');
+
+  const fullFence = text.match(/^```(?:css)?\s*\n([\s\S]*?)\n```$/i);
+  if (fullFence) text = fullFence[1].trim();
+  if (/```/.test(text)) throw new Error('Ox CSS override contains an unexpected Markdown fence.');
+  if (Buffer.byteLength(text, 'utf8') > MAX_CSS_OVERRIDE_BYTES) throw new Error('Ox CSS override is too large.');
+  if (/<\/?(?:script|style|link|iframe|object|embed)\b/i.test(text)) throw new Error('Ox CSS override contains HTML.');
+  if (/@import\b/i.test(text)) throw new Error('Ox CSS override may not use @import.');
+  if (/\burl\s*\(/i.test(text)) throw new Error('Ox CSS override may not load external or embedded URLs.');
+  if (/\bexpression\s*\(/i.test(text) || /javascript\s*:/i.test(text)) throw new Error('Ox CSS override contains unsafe CSS.');
+
+  const structural = cssStructuralText(text);
+  let depth = 0;
+  let sawBlock = false;
+  for (const ch of structural) {
+    if (ch === '{') {
+      depth += 1;
+      sawBlock = true;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth < 0) throw new Error('Ox CSS override has unbalanced braces.');
+    }
+  }
+  if (!sawBlock || depth !== 0) throw new Error('Ox CSS override is not structurally valid CSS.');
   return `${text}\n`;
 }
 
@@ -90,6 +127,15 @@ export function verifyPatchScope(job, output) {
   return changed;
 }
 
+export function verifyCssOverrideScope(job, output) {
+  normalizeCssOverrideOutput(output);
+  const files = (job.files || []).map(cleanPath).filter(Boolean);
+  if (files.length !== 1 || !files[0].toLowerCase().endsWith('.css')) {
+    throw new Error(`${job.id}: css-override mode requires exactly one declared .css file.`);
+  }
+  return files;
+}
+
 export function verifyPatchApplies(output, rootDir = process.cwd()) {
   const patch = normalizePatchOutput(output);
   const result = spawnSync('git', ['apply', '--check', '--whitespace=nowarn', '-'], {
@@ -113,9 +159,18 @@ export function verifyResult(job, result, commitRef = '', rootDir = '') {
   const originalOutput = String(result.output ?? '').replace(/\r\n/g, '\n');
   if (!originalOutput.trim()) throw new Error(`${job.id}: empty result output.`);
 
-  const output = job.mode === 'patch' ? normalizePatchOutput(originalOutput) : originalOutput.trim();
-  const changedFiles = job.mode === 'patch' ? verifyPatchScope(job, output) : [];
-  if (job.mode === 'patch' && rootDir) verifyPatchApplies(output, rootDir);
+  let output;
+  let changedFiles = [];
+  if (job.mode === 'patch') {
+    output = normalizePatchOutput(originalOutput);
+    changedFiles = verifyPatchScope(job, output);
+    if (rootDir) verifyPatchApplies(output, rootDir);
+  } else if (job.mode === 'css-override') {
+    output = normalizeCssOverrideOutput(originalOutput);
+    changedFiles = verifyCssOverrideScope(job, output);
+  } else {
+    output = originalOutput.trim();
+  }
 
   return {
     ...result,
@@ -139,7 +194,7 @@ function loadEnabledJobs(rootDir) {
     .filter(job => job?.enabled === true)
     .map(job => ({
       id: String(job.id || '').trim(),
-      mode: job.mode === 'review' ? 'review' : 'patch',
+      mode: job.mode === 'review' ? 'review' : job.mode === 'css-override' ? 'css-override' : 'patch',
       files: Array.isArray(job.files) ? job.files : []
     }));
 }
@@ -177,6 +232,7 @@ export function main(rootDir = process.cwd()) {
       id: result.id,
       model: result.model,
       mode: result.mode,
+      reasoning_effort: result.reasoning_effort,
       verified: result.verified,
       changed_files: result.changed_files,
       output_sha256: result.output_sha256,
