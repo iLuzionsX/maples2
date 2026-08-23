@@ -1,9 +1,9 @@
 {
   "id": "graphics-realism-ab",
-  "enabled": true,
+  "enabled": false,
   "mode": "patch",
   "reasoning_effort": "medium",
-  "task": "Independently polish Maples' real-time graphics/VFX for a commercial-indie A/B. Preserve every gameplay contract and the current stylized fantasy direction. In FX.js, replace hard programmer-art particles with softer layered sparks, spell energy, mist, embers and restrained debris while preserving all method signatures. In ShowcasePass.js, improve renderer/light balance, atmospheric depth and combat VFX without changing the stream, bridge, boss timing, camera, UI, assets or gameplay. Keep effects grounded rather than neon-heavy. Use only existing Three.js/browser capabilities, no dependencies or external assets. Avoid significant draw-call/per-frame-allocation growth and keep low-quality/mobile efficient. Return ONLY a clean unified diff for the supplied files.",
+  "task": "Legacy combined graphics A/B job retained for history. Replaced by independently sharded FX and Showcase jobs so Ox inference can run concurrently within Netlify build limits.",
   "files": [
     "src/game/FX.js",
     "src/game/ShowcasePass.js"
