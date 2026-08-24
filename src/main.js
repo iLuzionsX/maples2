@@ -22,10 +22,12 @@ import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
 import { installCameraPitchControls } from './game/CameraPitchControls.js';
+import { installOxPerformancePass } from './game/OxPerformancePass.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
 enhanceInstance(game);
+installOxPerformancePass(game);
 
 const enterButton = document.querySelector('#enter-btn');
 enterButton.disabled = true;
