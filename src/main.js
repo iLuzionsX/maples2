@@ -22,10 +22,15 @@ import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
 import { installCameraPitchControls } from './game/CameraPitchControls.js';
+import { installSolPerformancePass } from './game/SolPerformancePass.js';
+import { optimizeSolStaticCulling } from './game/SolStaticCulling.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
 enhanceInstance(game);
+
+const agentPerformanceDisabled = new URLSearchParams(location.search).get('agentperf') === 'off';
+const solPerformancePass = agentPerformanceDisabled ? null : installSolPerformancePass(game);
 
 const enterButton = document.querySelector('#enter-btn');
 enterButton.disabled = true;
@@ -68,6 +73,7 @@ Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).th
     performancePass.rebatch();
     performanceExtensions?.freezeStaticDecor();
     await installNatureInstancing(game);
+    if (solPerformancePass) optimizeSolStaticCulling(game);
   }
   enterButton.textContent = 'Enter the Glade';
   enterButton.disabled = false;
