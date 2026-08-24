@@ -51,14 +51,22 @@ function stopAll() {
 }
 
 function removeBaseline() {
-  const result = spawnSync('git', ['worktree', 'remove', '--force', baselineDir], { cwd: root, stdio: 'inherit' });
+  const result = spawnSync('git', ['worktree', 'remove', '--force', baselineDir], { cwd: root, stdio: 'ignore' });
   if (result.status !== 0) fs.rmSync(baselineDir, { recursive: true, force: true });
   spawnSync('git', ['worktree', 'prune'], { cwd: root, stdio: 'ignore' });
+}
+
+async function ensureBaselineCommit() {
+  const local = spawnSync('git', ['cat-file', '-e', `${baselineCommit}^{commit}`], { cwd: root, stdio: 'ignore' });
+  if (local.status === 0) return;
+  console.log(`Fetching pinned baseline ${baselineCommit} for exact-main A/B measurement.`);
+  await run('git', ['fetch', '--no-tags', '--depth=1', 'origin', baselineCommit], { timeoutMs: 120000 });
 }
 
 const validationEnv = { ...process.env, MAPLES_TEST_BASE_URL: candidateUrl };
 try {
   removeBaseline();
+  await ensureBaselineCommit();
   await run('git', ['worktree', 'add', '--detach', baselineDir, baselineCommit], { timeoutMs: 120000 });
   const nodeModules = path.join(baselineDir, 'node_modules');
   fs.rmSync(nodeModules, { recursive: true, force: true });
