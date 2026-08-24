@@ -1,5 +1,5 @@
 [build]
-  command = "node tests/enemy-facing-unit.mjs && npm run test:movement:unit && npm run test:mobile:unit && node tests/ui-production-unit.mjs && node tests/ox-delegate-unit.mjs && node tests/ox-verify-output-unit.mjs && node scripts/netlify-validate.mjs && mkdir -p dist/__ox && node scripts/ox-delegate.mjs > dist/__ox/delegate-log.txt 2>&1 && node scripts/ox-verify-output.mjs > dist/__ox/verify-log.txt 2>&1 && node scripts/ox-render-preview.mjs"
+  command = "node tests/pointer-lock-unit.mjs && node tests/enemy-facing-unit.mjs && npm run test:movement:unit && npm run test:mobile:unit && node tests/ui-production-unit.mjs && node tests/ox-delegate-unit.mjs && node tests/ox-verify-output-unit.mjs && node scripts/netlify-validate.mjs && mkdir -p dist/__ox && node scripts/ox-delegate.mjs > dist/__ox/delegate-log.txt 2>&1 && node scripts/ox-verify-output.mjs > dist/__ox/verify-log.txt 2>&1 && node scripts/ox-render-preview.mjs"
   publish = "dist"
 
 [[headers]]
