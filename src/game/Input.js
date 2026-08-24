@@ -12,8 +12,44 @@ export class Input {
     this._bind();
   }
 
+  _restoreCursor() {
+    if (this.canvas?.style) this.canvas.style.cursor = '';
+    if (document.documentElement?.style) document.documentElement.style.cursor = '';
+    if (document.body?.style) document.body.style.cursor = '';
+  }
+
+  _syncPointerLockState() {
+    this.pointerLocked = document.pointerLockElement === this.canvas;
+    if (!this.pointerLocked) {
+      this.mouseDX = 0;
+      this.mouseDY = 0;
+      this._restoreCursor();
+    }
+  }
+
+  requestPointerLock() {
+    if (this.isCoarse || document.hidden || document.pointerLockElement === this.canvas) return;
+    try {
+      const pending = this.canvas.requestPointerLock?.();
+      pending?.catch?.(() => this._syncPointerLockState());
+    } catch {
+      this._syncPointerLockState();
+    }
+  }
+
+  releasePointerLock() {
+    this.pointerLocked = false;
+    this.mouseDX = 0;
+    this.mouseDY = 0;
+    this._restoreCursor();
+    if (document.pointerLockElement === this.canvas) {
+      try { document.exitPointerLock?.(); } catch {}
+    }
+  }
+
   _bind() {
     addEventListener('keydown', e => {
+      if (e.code === 'Escape') this.releasePointerLock();
       if (!this.keys.has(e.code)) this.pressed.add(e.code);
       this.keys.add(e.code);
       if (['Space','KeyW','KeyA','KeyS','KeyD'].includes(e.code)) e.preventDefault();
@@ -22,11 +58,16 @@ export class Input {
 
     this.canvas.addEventListener('mousedown', e => {
       if (e.button === 0) this.pressed.add('Mouse0');
-      if (!this.isCoarse && document.pointerLockElement !== this.canvas) this.canvas.requestPointerLock?.();
+      this.requestPointerLock();
     });
-    document.addEventListener('pointerlockchange', () => {
-      this.pointerLocked = document.pointerLockElement === this.canvas;
+    document.addEventListener('pointerlockchange', () => this._syncPointerLockState());
+    document.addEventListener('pointerlockerror', () => this._syncPointerLockState());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.releasePointerLock();
     });
+    addEventListener('blur', () => this.releasePointerLock());
+    addEventListener('pagehide', () => this.releasePointerLock());
+    addEventListener('beforeunload', () => this.releasePointerLock());
     document.addEventListener('mousemove', e => {
       if (this.pointerLocked) {
         this.mouseDX += e.movementX;
