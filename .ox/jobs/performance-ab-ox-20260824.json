@@ -1,6 +1,6 @@
 {
   "id": "performance-ab-ox-20260824",
-  "enabled": false,
+  "enabled": true,
   "mode": "source-rewrite",
   "reasoning_effort": "medium",
   "task": "Independently optimize this Three.js action-RPG for the largest real FPS/frame-time improvement with effectively zero visible quality loss and no gameplay regressions. You are the sole author of the B-side optimization strategy. Inspect the supplied latest-main rendering/gameplay context and implement a compact runtime optimization pass in OxPerformancePass.js only. Focus on actual CPU/GPU hot paths: repeated traversal/culling/matrix work, per-frame allocations/GC, VFX lifecycle, enemy/animation updates, environment/nature rendering, transparent overdraw, draw-call/object overhead, or safe visibility/update-frequency techniques that preserve the same presentation. Do not lower render resolution/pixel ratio, remove or reduce assets/effects/enemies/environment density, degrade lighting/shadows/animations, alter UI/controls/camera/gameplay values, or copy another agent. Preserve existing wrapper chains and public behavior. Return only complete replacement JavaScript source exporting installOxPerformancePass(game).",
