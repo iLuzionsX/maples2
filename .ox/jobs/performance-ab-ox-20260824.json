@@ -1,0 +1,18 @@
+{
+  "id": "performance-ab-ox-20260824",
+  "enabled": true,
+  "mode": "patch",
+  "task": "Independently optimize this Three.js action-RPG for the largest real FPS/frame-time improvement with effectively zero visible quality loss and no gameplay regressions. Start from the code you are given; do not assume any other agent strategy. Focus on true CPU/GPU hot paths: draw calls/object count, repeated traversal/culling/matrix work, per-frame allocations/GC, VFX lifecycle, shadows/material/render cost, animation/enemy updates, nature/environment work, transparent overdraw, static work, visibility/distance/update-frequency opportunities that preserve identical presentation. Do not lower render resolution/pixel ratio, remove effects/assets/enemies, reduce environment density, degrade lighting/shadows/animations, alter UI/controls/camera/gameplay, or fake FPS gains. Prefer measurable, conservative structural optimizations. Preserve existing public APIs and compatibility wrappers. Return only a canonical unified diff touching only the listed files.",
+  "files": [
+    "src/game/Game.js",
+    "src/game/Character.js",
+    "src/game/Enemy.js",
+    "src/game/FX.js",
+    "src/game/PerformancePass.js",
+    "src/game/PerformanceExtensions.js",
+    "src/game/NatureInstancing.js",
+    "src/game/ShowcasePass.js"
+  ],
+  "model": "auto:ox-alpha",
+  "max_tokens": 32000
+}
