@@ -1,5 +1,5 @@
 [build]
-  command = "node tests/enemy-facing-unit.mjs && npm run test:movement:unit && npm run test:mobile:unit && node tests/ui-production-unit.mjs && node tests/ox-delegate-unit.mjs && node scripts/ox-delegate-performance-source.mjs && node scripts/ox-render-performance-preview.mjs && node scripts/performance-branch-runner.mjs"
+  command = "node tests/enemy-facing-unit.mjs && npm run test:movement:unit && npm run test:mobile:unit && node tests/ui-production-unit.mjs && node tests/ox-delegate-unit.mjs && node scripts/ox-delegate-performance-source.mjs"
   publish = "dist"
 
 [[headers]]
