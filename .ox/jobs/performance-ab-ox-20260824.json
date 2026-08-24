@@ -1,9 +1,11 @@
 {
   "id": "performance-ab-ox-20260824",
-  "enabled": true,
-  "mode": "patch",
-  "task": "Independently optimize this Three.js action-RPG for the largest real FPS/frame-time improvement with effectively zero visible quality loss and no gameplay regressions. Start from the code you are given; do not assume any other agent strategy. Focus on true CPU/GPU hot paths: draw calls/object count, repeated traversal/culling/matrix work, per-frame allocations/GC, VFX lifecycle, shadows/material/render cost, animation/enemy updates, nature/environment work, transparent overdraw, static work, visibility/distance/update-frequency opportunities that preserve identical presentation. Do not lower render resolution/pixel ratio, remove effects/assets/enemies, reduce environment density, degrade lighting/shadows/animations, alter UI/controls/camera/gameplay, or fake FPS gains. Prefer measurable, conservative structural optimizations. Preserve existing public APIs and compatibility wrappers. Return only a canonical unified diff touching only the listed files.",
-  "files": [
+  "enabled": false,
+  "mode": "source-rewrite",
+  "reasoning_effort": "medium",
+  "task": "Independently optimize this Three.js action-RPG for the largest real FPS/frame-time improvement with effectively zero visible quality loss and no gameplay regressions. You are the sole author of the B-side optimization strategy. Inspect the supplied latest-main rendering/gameplay context and implement a compact runtime optimization pass in OxPerformancePass.js only. Focus on actual CPU/GPU hot paths: repeated traversal/culling/matrix work, per-frame allocations/GC, VFX lifecycle, enemy/animation updates, environment/nature rendering, transparent overdraw, draw-call/object overhead, or safe visibility/update-frequency techniques that preserve the same presentation. Do not lower render resolution/pixel ratio, remove or reduce assets/effects/enemies/environment density, degrade lighting/shadows/animations, alter UI/controls/camera/gameplay values, or copy another agent. Preserve existing wrapper chains and public behavior. Return only complete replacement JavaScript source exporting installOxPerformancePass(game).",
+  "files": ["src/game/OxPerformancePass.js"],
+  "context_files": [
     "src/game/Game.js",
     "src/game/Character.js",
     "src/game/Enemy.js",
@@ -13,6 +15,8 @@
     "src/game/NatureInstancing.js",
     "src/game/ShowcasePass.js"
   ],
-  "model": "auto:ox-alpha",
-  "max_tokens": 32000
+  "model": "stealth/ox-alpha",
+  "max_tokens": 7000,
+  "request_timeout_ms": 180000,
+  "max_attempts": 2
 }
