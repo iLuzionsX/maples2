@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 export const JOB_PATH = '.ox/jobs/ponytail-review.json';
 export const CONTEXT_PATH = '.ox/context/ponytail-review.diff';
 const MAX_FILE_BYTES = 1_500_000;
+const MAX_TOTAL_INPUT_BYTES = 6_000_000;
 const MAX_REVIEW_FILES = 63;
 const MAX_DIFF_BYTES = 1_500_000;
 const EXCLUDED_PREFIXES = ['.git/', '.ox/jobs/', '.ox/context/', 'dist/', 'node_modules/'];
@@ -131,10 +132,17 @@ export function prepareReview(rootDir = process.cwd(), options = {}) {
   }
 
   const diff = buildDiff(root, baseRef, files);
+  const header = `# Maples Ponytail/Ox branch review\n# Base: ${baseRef}\n# Branch: ${branch}\n# Generated: ${new Date().toISOString()}\n\n`;
+  const contextText = `${header}${diff}`;
+  const selectedBytes = files.reduce((total, file) => total + fs.statSync(path.join(root, file)).size, 0);
+  const totalInputBytes = selectedBytes + Buffer.byteLength(contextText, 'utf8');
+  if (totalInputBytes > MAX_TOTAL_INPUT_BYTES) {
+    throw new Error(`Ponytail/Ox review input is ${totalInputBytes} bytes; bridge maximum is ${MAX_TOTAL_INPUT_BYTES}. Split the change into a narrower review.`);
+  }
+
   const contextAbsolute = path.join(root, CONTEXT_PATH);
   fs.mkdirSync(path.dirname(contextAbsolute), { recursive: true });
-  const header = `# Maples Ponytail/Ox branch review\n# Base: ${baseRef}\n# Branch: ${branch}\n# Generated: ${new Date().toISOString()}\n\n`;
-  fs.writeFileSync(contextAbsolute, `${header}${diff}`);
+  fs.writeFileSync(contextAbsolute, contextText);
 
   const job = {
     id: 'ponytail-review',
