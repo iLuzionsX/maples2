@@ -1,0 +1,17 @@
+{
+  "id": "ponytail-review",
+  "enabled": true,
+  "mode": "review",
+  "reasoning_effort": "high",
+  "task": "Act as Maples' independent Ponytail-style simplification reviewer. Review ONLY unnecessary complexity in the supplied branch diff and selected files; do not perform a general correctness review and do not apply changes.\n\nUse this decision order when proposing a cut: unnecessary feature -> existing repo implementation -> JavaScript/Node standard capability -> browser/Three.js native capability -> already-installed dependency -> shorter equivalent logic -> otherwise keep the minimum custom implementation that preserves behavior.\n\nMaples boundary: bespoke combat feel, animation, camera behavior, VFX, environment composition, enemy/boss behavior, art direction, mobile ergonomics, and other player-visible quality are presumed intentional. Never recommend deleting or weakening tests, validation, error handling, security, accessibility, mobile support, performance instrumentation, asset licensing/attribution, or behavior required by the diff. Fewer lines are valuable only when player-visible quality and system correctness are unchanged.\n\nTreat .ox/context/ponytail-review.diff as the authoritative change under review. Use full selected files only to understand integration and reuse opportunities. For each worthwhile finding output one line in this form: file:Lx-Ly: <delete|stdlib|native|yagni|shrink>: <what can go> -> <simpler replacement>. End with exactly \"net: -N lines possible.\" If nothing should be cut, output exactly \"Lean already. Ship.\"",
+  "files": [
+    ".ox/context/ponytail-review.diff",
+    "docs/PONYTAIL_OX_WORKFLOW.md",
+    "netlify.toml",
+    "package.json",
+    "scripts/prepare-ponytail-review.mjs",
+    "tests/ponytail-review-unit.mjs"
+  ],
+  "model": "auto:ox-alpha",
+  "max_tokens": 8000
+}
