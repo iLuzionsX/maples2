@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "id": "ab-implementation-proposal",
+  "enabled": false,
+  "mode": "implementation",
+  "objective": "Develop one isolated A/B implementation proposal for the named subsystem. Keep the variant independently reviewable and avoid unrelated gameplay or visual changes.",
+  "role": "senior gameplay and rendering engineer preparing a controlled A/B variant",
+  "allowed_files": ["src/game/PerformancePass.js", "src/game/PerformanceExtensions.js", "tests/performance-ab.mjs"],
+  "relevant_context": "This must remain an independent feature-branch proposal. Sol will inspect the unified diff, run validation, and decide what is applied. Never commit, merge, or apply the patch.",
+  "acceptance_criteria": ["Return a unified diff only inside the allowlist", "Preserve quality and public interfaces", "State risks and the A/B measurement needed"],
+  "commands": ["npm run build", "npm run test:movement:unit"],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 12,
+  "max_tokens": 40000,
+  "max_changed_files": 3,
+  "max_patch_bytes": 131072
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "ui-design-critique",
+  "enabled": false,
+  "mode": "review",
+  "objective": "Critique the Maples HUD and interaction design for hierarchy, readability, premium visual quality, accessibility, desktop behavior, narrow-phone layout, landscape safe areas, and touch ergonomics.",
+  "role": "principal product designer with frontend accessibility expertise",
+  "allowed_files": ["src/style.css", "src/premium-ui.css", "src/ui-production-pass.css", "src/narrow-hud-fix.css", "src/main.js"],
+  "relevant_context": "The visual target is a commercial-indie stylized fantasy game: intentional, readable, not busy. Preserve existing UI contracts and mobile controls. Review only; no CSS override or patch is applicable.",
+  "acceptance_criteria": ["Explain why each finding matters to a player", "Distinguish desktop from mobile issues", "Prefer focused, implementable recommendations"],
+  "commands": [],
+  "requested_output": "structured_review",
+  "reasoning_effort": "high",
+  "max_turns": 8,
+  "max_tokens": 24000
+}

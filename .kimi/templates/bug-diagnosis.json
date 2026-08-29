@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "bug-diagnosis",
+  "enabled": false,
+  "mode": "review",
+  "objective": "Diagnose a reported gameplay or presentation bug using the selected files, trace the likely authority and lifecycle, and propose a minimal verification plan.",
+  "role": "senior gameplay systems debugger",
+  "allowed_files": ["src/game/Game.js", "src/game/Character.js", "src/game/Enemy.js", "src/game/Input.js", "tests/movement-unit.mjs"],
+  "relevant_context": "Preserve working movement, combat, animation, camera, enemy, mobile, and performance systems. Do not infer hidden files. Review only until Sol approves a separate implementation job.",
+  "acceptance_criteria": ["Trace evidence from code rather than guessing", "Name competing hypotheses and how to falsify them", "Do not claim runtime validation without an approved command result"],
+  "commands": ["npm run test:movement:unit"],
+  "requested_output": "structured_review",
+  "reasoning_effort": "high",
+  "max_turns": 8,
+  "max_tokens": 24000
+}
