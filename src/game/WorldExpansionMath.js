@@ -3,7 +3,8 @@ const EPSILON = 1e-6;
 export function pointInCircle(x, z, zone) {
   const dx = x - zone.x;
   const dz = z - zone.z;
-  return dx * dx + dz * dz <= zone.radius * zone.radius;
+  const radius = zone.radius + EPSILON;
+  return dx * dx + dz * dz <= radius * radius;
 }
 
 export function closestPointOnSegment2D(x, z, ax, az, bx, bz) {
@@ -19,7 +20,8 @@ export function pointInCapsule(x, z, zone) {
   const nearest = closestPointOnSegment2D(x, z, zone.ax, zone.az, zone.bx, zone.bz);
   const dx = x - nearest.x;
   const dz = z - nearest.z;
-  return dx * dx + dz * dz <= zone.radius * zone.radius;
+  const radius = zone.radius + EPSILON;
+  return dx * dx + dz * dz <= radius * radius;
 }
 
 export function pointInZone(x, z, zone) {
@@ -86,7 +88,7 @@ export function pushPointOutsideCircle(x, z, blocker, padding = 0) {
   const dx = x - blocker.x;
   const dz = z - blocker.z;
   const distance = Math.hypot(dx, dz);
-  if (distance >= radius) return { x, z, pushed: false };
+  if (distance + EPSILON >= radius) return { x, z, pushed: false };
 
   if (distance <= EPSILON) {
     return { x: blocker.x + radius, z: blocker.z, pushed: true };
