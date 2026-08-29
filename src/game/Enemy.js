@@ -10,9 +10,9 @@ export class Enemy {
     this.root=new THREE.Group();scene.add(this.root);this.root.position.copy(position);
     const teleMat=new THREE.MeshBasicMaterial({color:this.isBoss?0xff6f59:0xffb86b,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false,blending:THREE.AdditiveBlending});
     this.telegraph=new THREE.Mesh(new THREE.RingGeometry(this.isBoss?1.5:.62,this.isBoss?1.67:.72,28),teleMat);this.telegraph.rotation.x=-Math.PI/2;this.telegraph.position.y=.025;this.root.add(this.telegraph);
-    this.velocity=new V();this.facing=Math.random()*Math.PI*2;
+    this.velocity=new V();this.facing=Math.random()*Math.PI*2;this.attackFacing=this.facing;this.attackDir=new V();
     this.state='spawn';this.stateTime=0;this.stateDuration=.55;
-    this.attackEvent=false;this.attackSerial=0;this.dead=false;this.remove=false;this.hitFlash=0;
+    this.attackEvent=false;this.attackEventFired=false;this.attackSerial=0;this.dead=false;this.remove=false;this.hitFlash=0;
     this.maxHp=this.isBoss?650:58;this.hp=this.maxHp;
     this.speed=this.isBoss?1.55:2.15+Math.random()*.35;this.attackRange=this.isBoss?2.4:1.45;
     this.damage=this.isBoss?22:11;this.radius=this.isBoss?1.1:.55;
@@ -98,13 +98,21 @@ export class Enemy {
     } else if(this.state==='idle'){
       if(dist<(this.isBoss?18:12)){this.state='chase';this.stateTime=0;}
     } else if(this.state==='chase'){
-      if(dist<this.attackRange){this.state='windup';this.stateTime=0;this.stateDuration=this.isBoss?.92:.52;this.velocity.multiplyScalar(.35);}
-      else{this.velocity.x=damp(this.velocity.x,dir.x*this.speed,8,dt);this.velocity.z=damp(this.velocity.z,dir.z*this.speed,8,dt);}
+      if(dist<this.attackRange){
+        this.state='windup';this.stateTime=0;this.stateDuration=this.isBoss?.92:.52;this.velocity.multiplyScalar(.35);
+        this.attackFacing=Math.atan2(dir.x,dir.z);this.facing=this.attackFacing;this.attackDir.set(Math.sin(this.attackFacing),0,Math.cos(this.attackFacing));
+      } else {this.velocity.x=damp(this.velocity.x,dir.x*this.speed,8,dt);this.velocity.z=damp(this.velocity.z,dir.z*this.speed,8,dt);}
     } else if(this.state==='windup'){
       this.velocity.multiplyScalar(Math.exp(-dt*9));
-      if(this.stateTime>this.stateDuration){this.state='attack';this.stateTime=0;this.stateDuration=this.isBoss?.5:.24;this.attackEvent=true;this.attackSerial++;if(this.isBoss)this.fx.ring(this.position,0xff785f,.25,4.6,.55);}
+      if(this.stateTime>this.stateDuration){
+        this.state='attack';this.stateTime=0;this.stateDuration=this.isBoss?.5:.24;this.attackEventFired=false;this.attackSerial++;
+        if(this.isBoss)this.fx.ring(this.position,0xff785f,.25,4.6,.55);
+      }
     } else if(this.state==='attack'){
-      if(this.stateTime<this.stateDuration*.48){this.velocity.x=dir.x*(this.isBoss?3.7:5.4);this.velocity.z=dir.z*(this.isBoss?3.7:5.4);}else this.velocity.multiplyScalar(Math.exp(-dt*12));
+      const p=clamp(this.stateTime/this.stateDuration,0,1),impact=this.isBoss?.34:.3;
+      if(!this.attackEventFired && p>=impact){this.attackEvent=true;this.attackEventFired=true;}
+      if(p<.52){const speed=this.isBoss?3.55:5.2;this.velocity.x=this.attackDir.x*speed;this.velocity.z=this.attackDir.z*speed;}
+      else this.velocity.multiplyScalar(Math.exp(-dt*12));
       if(this.stateTime>this.stateDuration){this.state='recover';this.stateTime=0;this.stateDuration=this.isBoss?.72:.46;}
     } else if(this.state==='recover'){
       this.velocity.multiplyScalar(Math.exp(-dt*10));if(this.stateTime>this.stateDuration){this.state='chase';this.stateTime=0;}
@@ -112,7 +120,8 @@ export class Enemy {
       this.velocity.multiplyScalar(Math.exp(-dt*8));if(this.stateTime>this.stateDuration){this.state='chase';this.stateTime=0;}
     }
 
-    if(!['windup','stagger'].includes(this.state) && dir.lengthSq()>.01){const target=Math.atan2(dir.x,dir.z);let d=((target-this.facing+Math.PI)%(Math.PI*2))-Math.PI;this.facing+=d*(1-Math.exp(-dt*8));}
+    if(!['windup','attack','stagger'].includes(this.state) && dir.lengthSq()>.01){const target=Math.atan2(dir.x,dir.z);let d=((target-this.facing+Math.PI)%(Math.PI*2))-Math.PI;this.facing+=d*(1-Math.exp(-dt*8));}
+    if(this.state==='windup'||this.state==='attack')this.facing=this.attackFacing;
     this.position.addScaledVector(this.velocity,dt);this.root.rotation.y=this.facing;
     this._animate(dt,dist);
   }

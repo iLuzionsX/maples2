@@ -1,0 +1,10 @@
+{
+  "id": "game-combat-integration-k3",
+  "enabled": false,
+  "mode": "patch",
+  "task": "Implement the GAME-SIDE combat integration pass for Maples in Game.js only, assuming Character.js now owns Rowan's action/combo timing. Return ONLY a canonical unified diff. No prose, no new files, no unrelated cleanup. Preserve encounter, HUD, camera, loot/XP, spawning, world collision, pointer-lock and mobile contracts.\n\nRemove or collapse duplicated Game-owned player action authority: attackCooldown/comboStep/comboDeadline/attackQueued must not compete with Character's authoritative action machine. Game should consume Character's one-shot melee hit event/query and resolve world consequences only. Preserve real-time semantics for spell/dodge/encounter timers during hit-stop.\n\nImprove real-hit feedback using existing hooks: combo-tiered hit-stop, camera shake/kick, slash/ring/burst/audio response, and a clearly stronger third-hit finisher without fake impact. Keep current damage/range balance recognizable. Spell keeps mana/cooldown behavior and deliberate cast state; improve projectile impact only if existing hooks permit it without resource churn. Avoid obvious hot-loop temporary allocations in melee/projectile checks where a compact reuse is safe. Do not modify Enemy.js in this pass.",
+  "files": ["src/game/Game.js"],
+  "model": "moonshotai/kimi-k3",
+  "reasoning_effort": "high",
+  "max_tokens": 6000
+}

@@ -47,12 +47,8 @@ export class Game {
     this.gameTime = 0;
     this.started = false;
     this.hitStop = 0;
-    this.attackCooldown = 0;
     this.spellCooldown = 0;
     this.dodgeCooldown = 0;
-    this.comboStep = 0;
-    this.comboDeadline = 0;
-    this.attackQueued = false;
     this.combatCombo = 0;
     this.combatComboTimer = 0;
     this.respawnTimer = 0;
@@ -171,10 +167,8 @@ export class Game {
       dt *= .06;
     }
 
-    this.attackCooldown = Math.max(0, this.attackCooldown-realDt);
     this.spellCooldown = Math.max(0, this.spellCooldown-realDt);
     this.dodgeCooldown = Math.max(0, this.dodgeCooldown-realDt);
-    this.comboDeadline -= realDt;
     this.combatComboTimer -= realDt;
     if (this.combatComboTimer<=0) this.combatCombo=0;
     if (this.toastTimer>0) { this.toastTimer-=realDt; if(this.toastTimer<=0)this.ui.toast.classList.remove('show'); }
@@ -186,7 +180,7 @@ export class Game {
     const moveWorld = this._moveVector(move);
 
     this._handleInput(moveWorld);
-    this.player.update(dt, move, this.cameraYaw);
+    this.player.update(dt, move, this.cameraYaw, realDt);
     this.world.clampToArena(this.player.position);
     if (this.player.attackWindow()) this._resolveMelee();
 
@@ -203,18 +197,7 @@ export class Game {
   }
 
   _handleInput(moveWorld) {
-    const attackPressed = this.input.consume('attack');
-    if (attackPressed) {
-      if (this.player.state === 'attack') {
-        if (this.player.stateTime / this.player.stateDuration > .48) this.attackQueued = true;
-      } else if (this.attackCooldown <= 0 && !this.player.dead) {
-        this._startAttack();
-      }
-    }
-    if (this.attackQueued && this.player.state === 'idle' && this.attackCooldown <= 0) {
-      this.attackQueued = false;
-      this._startAttack();
-    }
+    if (this.input.consume('attack') && !this.player.dead) this._startAttack();
 
     if (this.input.consume('dodge') && this.dodgeCooldown<=0 && !this.player.dead) {
       if (this.player.beginDodge(moveWorld)) {
@@ -222,30 +205,26 @@ export class Game {
       }
     }
 
-    if (this.input.consume('spell') && this.spellCooldown<=0 && this.player.mana>=26 && !this.player.dead && this.player.state!=='dodge') {
+    if (this.input.consume('spell') && this.spellCooldown<=0 && this.player.mana>=26 && !this.player.dead && !['dodge','attack','hurt'].includes(this.player.state)) {
       this._castSpell();
     }
   }
 
   _startAttack() {
-    if (this.comboDeadline <= 0) this.comboStep = 0;
-    else this.comboStep = (this.comboStep+1)%3;
-    if (this.player.beginAttack(this.comboStep)) {
-      this.attackCooldown = [.22,.24,.35][this.comboStep];
-      this.comboDeadline = .72;
-    }
+    return this.player.requestAttack?.() ?? this.player.beginAttack(0);
   }
 
   _resolveMelee() {
     const combo = this.player.comboIndex;
-    const forward = new V(Math.sin(this.player.facing),0,Math.cos(this.player.facing));
+    const facing = this.player.attackFacing ?? this.player.facing;
+    const forward = new V(Math.sin(facing),0,Math.cos(facing));
     const origin = this.player.position.clone();
     const range = [2.15,2.25,2.75][combo];
     const arc = [0.22,0.15,-.15][combo];
     const base = [19,23,36][combo];
     let hits = 0;
 
-    this.fx.slash(origin, this.player.facing, combo);
+    this.fx.slash(origin, facing, combo);
     for (const e of this.enemies) {
       if (e.dead) continue;
       const to = e.position.clone().sub(origin); to.y=0;
@@ -262,10 +241,10 @@ export class Game {
       }
     }
     if (hits) {
-      this.hitStop = combo===2?.078:.043;
-      this.cameraShake = Math.max(this.cameraShake, combo===2?.55:.27);
-      this.cameraKick = Math.max(this.cameraKick, combo===2?.5:.22);
-      if(combo===2) this.fx.ring(origin,0xffd17d,.25,2.0,.22);
+      this.hitStop = combo===2?.082:combo===1?.05:.041;
+      this.cameraShake = Math.max(this.cameraShake, combo===2?.58:combo===1?.32:.24);
+      this.cameraKick = Math.max(this.cameraKick, combo===2?.54:combo===1?.28:.2);
+      if(combo===2) this.fx.ring(origin,0xffd17d,.25,2.1,.24);
     }
   }
 
@@ -313,7 +292,7 @@ export class Game {
 
       if (e.attackEvent && !this.player.dead) {
         const dist=e.position.distanceTo(this.player.position);
-        const hitRange=e.isBoss?4.35:1.75;
+        const hitRange=e.attackRange+(e.isBoss?.55:.3);
         if(dist<hitRange){
           if(this.player.takeDamage(e.damage,e.position)){
             this.ui.damageFlash.classList.add('hit');setTimeout(()=>this.ui.damageFlash.classList.remove('hit'),55);

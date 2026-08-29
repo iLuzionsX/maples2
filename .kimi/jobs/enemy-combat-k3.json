@@ -1,0 +1,10 @@
+{
+  "id": "enemy-combat-k3",
+  "enabled": false,
+  "mode": "patch",
+  "task": "Implement an ENEMY COMBAT FAIRNESS/FEEL pass for Maples in Enemy.js only. Return ONLY a canonical unified diff. No prose, no new files, no unrelated rendering cleanup. Preserve enemy types, death/reward/progression contracts, imported visual attachment compatibility, and public fields Game reads.\n\nMake attacks read as windup -> active strike -> recovery. Emit attackEvent once during the meaningful active phase, not on the windup-to-attack transition. Lock or strongly limit facing once the strike is committed so telegraphs stay honest. Align attackRange/forward lunge with the actual damage opportunity; Thornmaw must feel heavy but fair rather than hitting far outside its declared range. Keep boss cadence threatening without unavoidable reach.\n\nNon-boss hit reaction/stagger should provide useful confirmation without enabling permanent pack stun-lock. Preserve chase behavior and spawn/death flow. Avoid per-frame allocations where a compact reusable vector is safe, but prefer correctness/readability. Keep the existing animation state names and normalized stateTime/stateDuration contracts coherent for polish systems.",
+  "files": ["src/game/Enemy.js"],
+  "model": "moonshotai/kimi-k3",
+  "reasoning_effort": "high",
+  "max_tokens": 5000
+}

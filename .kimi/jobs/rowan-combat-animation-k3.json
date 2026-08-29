@@ -1,0 +1,14 @@
+{
+  "id": "rowan-combat-animation-k3",
+  "enabled": false,
+  "mode": "patch",
+  "task": "Implement a ROWAN COMBAT ANIMATION/PRESENTATION pass for Maples using the existing imported GLB animation/polish architecture. Return ONLY a canonical unified diff. No prose, no new files, no unrelated systems. Character remains authoritative for action state/timing; presentation must consume that timeline rather than invent a competing action clock.\n\nPolish anticipation, weight transfer, strike acceleration, follow-through, recovery, combo differentiation, dodge silhouette/recovery, hit reaction, weapon-trail timing, cape/hair secondary motion, and transitions back to locomotion. The third strike should visibly read as the committed finisher. Preserve imported clip selection, foot IK, current rig resolution, mobile performance and existing public manager/test surfaces. Do not fake gameplay hits with animation or VFX. Avoid per-frame allocations where practical, especially quaternion/vector creation in hot layers, without broad refactors.",
+  "files": [
+    "src/game/RowanAnimationDirector.js",
+    "src/game/AnimationPolish.js",
+    "src/game/Enhancements.js"
+  ],
+  "model": "moonshotai/kimi-k3",
+  "reasoning_effort": "high",
+  "max_tokens": 7000
+}

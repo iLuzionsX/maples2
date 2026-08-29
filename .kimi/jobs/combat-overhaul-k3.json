@@ -1,0 +1,12 @@
+{
+  "id": "combat-overhaul-k3",
+  "enabled": false,
+  "mode": "patch",
+  "task": "Produce a SMALL, COMPLETE, APPLY-CLEAN CHARACTER COMBAT PATCH for src/game/Character.js only. Output ONLY one canonical unified diff beginning exactly with `diff --git a/src/game/Character.js b/src/game/Character.js`. No prose, Markdown fences, ellipses, omitted context, new files, or unrelated cleanup. Keep the patch under roughly 80 changed/added lines and ensure `git apply --check` can pass against the supplied exact file.\n\nTouch only combat state fields in the constructor plus beginAttack(), beginDodge(), update(), attackWindow(), and at most one tiny private helper. Do not rewrite _build(), _animate(), _attackPose(), leveling, materials, or geometry. Preserve all existing public fields/methods and remain runtime-compatible with current Game.js and Rowan animation systems.\n\nImprove feel surgically: explicit per-combo startup/active/recovery boundaries; exactly one attackWindow event per swing; stable facing through active frames; combo-specific forward commitment with hit 3 heaviest; dodge i-frames and a fair late-recovery attack-to-dodge cancel; clean idle recovery. Keep state/stateTime/stateDuration/comboIndex authoritative and coherent. Do not move Game input buffering/combo ownership in this pass. Prefer simple tables/constants and existing vectors over new per-frame allocations.\n\nBefore emitting, re-check every context line against the supplied Character.js. Return the smallest robust patch that materially improves control and impact.",
+  "files": [
+    "src/game/Character.js"
+  ],
+  "model": "moonshotai/kimi-k3",
+  "reasoning_effort": "medium",
+  "max_tokens": 3500
+}

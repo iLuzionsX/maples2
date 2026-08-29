@@ -73,12 +73,14 @@ Game.prototype._startAttack = function () {
 const resolveMelee = Game.prototype._resolveMelee;
 Game.prototype._resolveMelee = function () {
   resolveMelee.call(this);
-  const forward = new V(Math.sin(this.player.facing), 0, Math.cos(this.player.facing));
-  this.player.velocity.addScaledVector(forward, this.player.comboIndex === 2 ? 1.35 : .72);
+  const facing = this.player.attackFacing ?? this.player.facing;
+  const forward = new V(Math.sin(facing), 0, Math.cos(facing));
+  this.player.velocity.addScaledVector(forward, this.player.comboIndex === 2 ? .75 : .38);
 };
 
 Character.prototype.beginCast = function () {
-  if (this.dead || this.state === 'dodge') return false;
+  if (this.dead || this.state === 'dodge' || this.state === 'attack' || this.state === 'hurt') return false;
+  this.attackBuffer = 0;
   this.state = 'cast';
   this.stateTime = 0;
   this.stateDuration = .34;
@@ -87,8 +89,8 @@ Character.prototype.beginCast = function () {
 };
 
 const characterUpdate = Character.prototype.update;
-Character.prototype.update = function (dt, move, cameraYaw) {
-  characterUpdate.call(this, dt, move, cameraYaw);
+Character.prototype.update = function (dt, move, cameraYaw, realDt = dt) {
+  characterUpdate.call(this, dt, move, cameraYaw, realDt);
   if (this.state === 'cast' && this.stateTime >= this.stateDuration) {
     this.state = 'idle';
     this.stateTime = 0;
@@ -112,7 +114,7 @@ Character.prototype._animate = function (dt) {
 const castSpell = Game.prototype._castSpell;
 Game.prototype._castSpell = function () {
   this._faceNearestTarget(13, -.4);
-  this.player.beginCast?.();
+  if (this.player.beginCast?.() === false) return;
   castSpell.call(this);
   const projectile = this.projectiles.at(-1);
   if (!projectile || projectile.mesh.userData.showcaseEnhanced) return;
