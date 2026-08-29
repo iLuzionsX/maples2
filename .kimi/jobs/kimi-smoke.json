@@ -1,6 +1,6 @@
 {
   "id": "kimi-smoke-review",
-  "enabled": true,
+  "enabled": false,
   "mode": "review",
   "task": "Review the selected file for safe, production-quality improvements. Do not modify the repository.",
   "files": ["src/game/Game.js"],
