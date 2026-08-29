@@ -27,16 +27,20 @@ await page.waitForTimeout(450);
 
 const startup = await page.evaluate(() => {
   const game = window.__MAPLES_GAME__;
+  const oathBell = game.worldExpansion?.landmarks?.find(item => item.userData?.sculptSpec === 'briarwatchOathBell');
   return {
     quality: game.quality,
     hardwareConcurrency: navigator.hardwareConcurrency || null,
     deviceMemory: navigator.deviceMemory || null,
     expansionReady: Boolean(game.worldExpansion?.ready),
     terrainReady: Boolean(game.worldExpansionTerrain?.ready),
+    regionalLandmarksReady: Boolean(game.worldExpansionRegionalLandmarks?.ready),
     atmosphereReady: Boolean(game.worldExpansionAtmosphere?.ready),
     collisionReady: Boolean(game.worldExpansionCollisionPolish?.ready),
     terrainHiddenLegacy: game.worldExpansionTerrain?.hiddenLegacySurfaces || 0,
     landmarks: game.worldExpansion?.landmarks?.length || 0,
+    oathBell: Boolean(oathBell),
+    oathBellSockets: oathBell ? Object.keys(oathBell.userData?.sockets || {}) : [],
     blockers: game.worldExpansion?.blockers?.length || 0,
     landmarkBlockers: game.worldExpansionCollisionPolish?.landmarkBlockers?.length || 0,
     waterBlocker: game.worldExpansionCollisionPolish?.waterBlocker || null,
@@ -49,12 +53,15 @@ const startup = await page.evaluate(() => {
 // CI hardware classification is not a correctness invariant. Exercise whichever quality
 // tier the production detector selects, and record it alongside renderer measurements.
 if (!['high', 'low'].includes(startup.quality)) errors.push(`unexpected quality tier: ${startup.quality}`);
-if (!startup.expansionReady || !startup.terrainReady || !startup.atmosphereReady || !startup.collisionReady) {
+if (!startup.expansionReady || !startup.terrainReady || !startup.regionalLandmarksReady || !startup.atmosphereReady || !startup.collisionReady) {
   errors.push(`expanded world not fully ready: ${JSON.stringify(startup)}`);
 }
 if (startup.terrainHiddenLegacy < 6) errors.push(`legacy geometric ground still exposed: ${startup.terrainHiddenLegacy}`);
-if (startup.landmarks < 6) errors.push(`expected authored landmarks, got ${startup.landmarks}`);
-if (startup.landmarkBlockers < 7) errors.push(`landmark collider metadata not fully integrated: ${startup.landmarkBlockers}`);
+if (startup.landmarks < 7 || !startup.oathBell) errors.push(`expected Briarwatch Oath Bell plus authored landmarks: ${JSON.stringify(startup)}`);
+for (const socket of ['bell', 'ember', 'interaction']) {
+  if (!startup.oathBellSockets.includes(socket)) errors.push(`Briarwatch Oath Bell missing ${socket} socket`);
+}
+if (startup.landmarkBlockers < 8) errors.push(`landmark collider metadata not fully integrated: ${startup.landmarkBlockers}`);
 if (!startup.waterBlocker || startup.waterBlocker.type !== 'ellipse') errors.push('Glassmere water must use ellipse-aware collision');
 const minimumNature = startup.quality === 'high' ? 250 : 140;
 if (!startup.expansionNatureReady || startup.expansionNatureCount < minimumNature || !startup.reusedBasePrototypes) {
@@ -62,7 +69,7 @@ if (!startup.expansionNatureReady || startup.expansionNatureCount < minimumNatur
 }
 
 // These are intentionally clear traversal samples. Obstacle rejection is verified
-// separately below, so a valid Waystone collision cannot masquerade as a route failure.
+// separately below, so a valid landmark collision cannot masquerade as a route failure.
 const locations = [
   { key: 'hollowroad', x: 5, z: 70, yaw: Math.PI },
   { key: 'hollowroad-crossing', x: 7, z: 82, yaw: Math.PI * .9 },
@@ -117,15 +124,19 @@ const invariants = await page.evaluate(() => {
     (game.player.position.z - water.z) / (water.radiusZ + .34),
   );
 
-  const waystone = game.worldExpansionCollisionPolish.landmarkBlockers.find(blocker => String(blocker.source).includes('Waystone'));
-  let waystoneDistance = null;
-  let waystoneRequired = null;
-  if (waystone) {
-    game.player.position.set(waystone.x, 0, waystone.z);
+  const pushFromLandmarkCenter = match => {
+    const blocker = game.worldExpansionCollisionPolish.landmarkBlockers.find(item => String(item.source).includes(match));
+    if (!blocker) return null;
+    game.player.position.set(blocker.x, 0, blocker.z);
     game.world.clampToArena(game.player.position);
-    waystoneDistance = Math.hypot(game.player.position.x - waystone.x, game.player.position.z - waystone.z);
-    waystoneRequired = waystone.radius + .34;
-  }
+    return {
+      distance: Math.hypot(game.player.position.x - blocker.x, game.player.position.z - blocker.z),
+      required: blocker.radius + .34,
+    };
+  };
+
+  const waystone = pushFromLandmarkCenter('Waystone');
+  const oathBell = pushFromLandmarkCenter('OathBell');
 
   game.player.position.set(180, 0, 180);
   game.world.clampToArena(game.player.position);
@@ -136,8 +147,8 @@ const invariants = await page.evaluate(() => {
   return {
     enemyRadius,
     waterNorm,
-    waystoneDistance,
-    waystoneRequired,
+    waystone,
+    oathBell,
     boundaryDelta,
     authority: {
       playerClampCalls: game.worldTravelAuthority?.playerClampCalls || 0,
@@ -148,8 +159,9 @@ const invariants = await page.evaluate(() => {
 
 if (invariants.enemyRadius != null && invariants.enemyRadius > 28.001) errors.push(`enemy escaped encounter bubble: r=${invariants.enemyRadius}`);
 if (invariants.waterNorm < .999) errors.push(`player remained inside Glassmere water ellipse: norm=${invariants.waterNorm}`);
-if (invariants.waystoneDistance != null && invariants.waystoneDistance + 1e-5 < invariants.waystoneRequired) {
-  errors.push(`player remained inside Waystone collider: ${JSON.stringify(invariants)}`);
+for (const [name, result] of [['Waystone', invariants.waystone], ['Oath Bell', invariants.oathBell]]) {
+  if (!result) errors.push(`${name} collider was not derived from landmark metadata`);
+  else if (result.distance + 1e-5 < result.required) errors.push(`player remained inside ${name} collider: ${JSON.stringify(result)}`);
 }
 if (invariants.boundaryDelta > 1e-5) errors.push(`world-boundary clamp is not stable: delta=${invariants.boundaryDelta}`);
 if (invariants.authority.playerClampCalls < 1 || invariants.authority.encounterClampCalls < 1) {
