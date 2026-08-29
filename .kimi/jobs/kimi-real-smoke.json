@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "kimi-real-smoke",
-  "enabled": true,
+  "enabled": false,
   "mode": "review",
   "objective": "Perform a read-only FPS and frame-time review of the selected Maples performance code. First inspect the two performance files, then identify the highest-confidence bottleneck and one measurable next experiment. Do not propose a patch.",
   "role": "senior Three.js performance engineer",
