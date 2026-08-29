@@ -13,10 +13,6 @@ const browser = await chromium.launch({
   args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist'],
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
-await context.addInitScript(() => {
-  try { Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, get: () => 8 }); } catch {}
-  try { Object.defineProperty(navigator, 'deviceMemory', { configurable: true, get: () => 8 }); } catch {}
-});
 const page = await context.newPage();
 page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
 page.on('console', message => {
@@ -33,6 +29,8 @@ const startup = await page.evaluate(() => {
   const game = window.__MAPLES_GAME__;
   return {
     quality: game.quality,
+    hardwareConcurrency: navigator.hardwareConcurrency || null,
+    deviceMemory: navigator.deviceMemory || null,
     expansionReady: Boolean(game.worldExpansion?.ready),
     terrainReady: Boolean(game.worldExpansionTerrain?.ready),
     atmosphereReady: Boolean(game.worldExpansionAtmosphere?.ready),
@@ -48,7 +46,9 @@ const startup = await page.evaluate(() => {
   };
 });
 
-if (startup.quality !== 'high') errors.push(`expected forced high quality, got ${startup.quality}`);
+// CI hardware classification is not a correctness invariant. Exercise whichever quality
+// tier the production detector selects, and record it alongside renderer measurements.
+if (!['high', 'low'].includes(startup.quality)) errors.push(`unexpected quality tier: ${startup.quality}`);
 if (!startup.expansionReady || !startup.terrainReady || !startup.atmosphereReady || !startup.collisionReady) {
   errors.push(`expanded world not fully ready: ${JSON.stringify(startup)}`);
 }
@@ -56,7 +56,8 @@ if (startup.terrainHiddenLegacy < 6) errors.push(`legacy geometric ground still 
 if (startup.landmarks < 6) errors.push(`expected authored landmarks, got ${startup.landmarks}`);
 if (startup.landmarkBlockers < 7) errors.push(`landmark collider metadata not fully integrated: ${startup.landmarkBlockers}`);
 if (!startup.waterBlocker || startup.waterBlocker.type !== 'ellipse') errors.push('Glassmere water must use ellipse-aware collision');
-if (!startup.expansionNatureReady || startup.expansionNatureCount < 100 || !startup.reusedBasePrototypes) {
+const minimumNature = startup.quality === 'high' ? 250 : 140;
+if (!startup.expansionNatureReady || startup.expansionNatureCount < minimumNature || !startup.reusedBasePrototypes) {
   errors.push(`expanded nature pipeline not ready/reused: ${JSON.stringify(startup)}`);
 }
 
