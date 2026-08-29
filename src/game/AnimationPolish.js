@@ -242,15 +242,16 @@ function updateSwordGlow(state, player, dt) {
   if (!state.swordGlow.length) return;
   const attacking = player.state === 'attack';
   const p = attacking ? clamp(player.stateTime / player.stateDuration, 0, 1) : 0;
-  const strike = attacking ? Math.sin(Math.PI * clamp((p - .12) / .74, 0, 1)) : 0;
-  const finisher = player.comboIndex === 2 ? 1.45 : 1;
+  const phase = attacking ? player.attackPhase : 'none';
+  const strike = phase === 'active' ? 1 : phase === 'startup' ? clamp(p * 1.5, 0, .42) : phase === 'recovery' ? clamp((1 - p) * 1.8, 0, .6) : 0;
+  const finisher = player.comboIndex === 2 ? 1.55 : player.comboIndex === 1 ? 1.08 : 1;
   const tint = player.comboIndex === 2 ? warm : cool;
 
   for (const entry of state.swordGlow) {
     const material = entry.material;
     const power = strike * finisher;
-    material.emissive.copy(entry.emissive).lerp(tint, clamp(power * .68, 0, .82));
-    material.emissiveIntensity = damp(material.emissiveIntensity || 0, entry.intensity + power * 1.45, 16, dt);
+    material.emissive.copy(entry.emissive).lerp(tint, clamp(power * .7, 0, .88));
+    material.emissiveIntensity = damp(material.emissiveIntensity || 0, entry.intensity + power * 1.55, 18, dt);
   }
 }
 
@@ -274,10 +275,11 @@ function updatePlayerPolish(player, dt) {
 
   if (player.state === 'attack') {
     const p = clamp(player.stateTime / player.stateDuration, 0, 1);
-    const drive = Math.sin(Math.PI * clamp((p - .08) / .78, 0, 1));
-    pitch -= drive * (player.comboIndex === 2 ? .115 : .055);
-    roll += (player.comboIndex === 0 ? -.045 : player.comboIndex === 1 ? .045 : -.025) * drive;
-    squash = Math.sin(Math.PI * p) * (player.comboIndex === 2 ? .018 : .008);
+    const phase = player.attackPhase;
+    const drive = phase === 'active' ? 1 : phase === 'startup' ? clamp(p * 1.25, 0, .5) : clamp((1 - p) * 1.8, 0, .7);
+    pitch -= drive * (player.comboIndex === 2 ? .13 : player.comboIndex === 1 ? .068 : .058);
+    roll += (player.comboIndex === 0 ? -.05 : player.comboIndex === 1 ? .05 : -.03) * drive;
+    squash = (phase === 'active' ? 1 : Math.sin(Math.PI * p) * .45) * (player.comboIndex === 2 ? .022 : .009);
     bob = 0;
   } else if (player.state === 'dodge') {
     const p = clamp(player.stateTime / player.stateDuration, 0, 1);
@@ -298,8 +300,8 @@ function updatePlayerPolish(player, dt) {
   updateSwordGlow(state, player, dt);
 
   const attackProgress = player.state === 'attack' ? player.stateTime / Math.max(.01, player.stateDuration) : 0;
-  const trailActive = player.root.visible && player.state === 'attack' && attackProgress > .13 && attackProgress < .88;
-  const trailEnergy = player.comboIndex === 2 ? 1.35 : 1;
+  const trailActive = player.root.visible && player.state === 'attack' && (player.attackPhase === 'active' || (player.attackPhase === 'recovery' && attackProgress < .8));
+  const trailEnergy = player.comboIndex === 2 ? 1.5 : player.comboIndex === 1 ? 1.08 : 1;
   state.ribbon.update(dt, state.sword, trailActive, player.comboIndex, trailEnergy);
   manager.trailActive = state.ribbon.mesh.visible;
   manager.trailSamples = state.ribbon.samples.length;
@@ -341,6 +343,7 @@ function initEnemyPolish(enemy, manager) {
     glowMaterials: captureGlowMaterials(model),
     lastState: enemy.state,
     lastAttackSerial: enemy.attackSerial,
+    lastImpactSerial: -1,
     hitSign: Math.random() < .5 ? -1 : 1,
     bossLight: null,
   };
@@ -428,21 +431,20 @@ function updateEnemyPolish(enemy, dt) {
   if (state.bossLight) {
     let target = 0;
     if (enemy.state === 'windup') target = .35 + windupPower * 2.4;
-    else if (enemy.state === 'attack') target = 2.1;
+    else if (enemy.state === 'attack') target = enemy.attackEvent ? 2.7 : 1.35;
     state.bossLight.intensity = damp(state.bossLight.intensity, target, 16, dt);
   }
 
+  if (enemy.attackEvent && state.lastImpactSerial !== enemy.attackSerial) {
+    state.lastImpactSerial = enemy.attackSerial;
+    const strength = enemy.isBoss ? 1.9 : .72;
+    emitGroundDust(enemy.fx, enemy.position, strength, enemy.attackFacing ?? enemy.facing, 0);
+    if (enemy.isBoss) enemy.fx.burst(enemy.position.clone().add(new V(0, .35, 0)), 0xff9a67, 10, 3.1, 1.15);
+    manager.impactEvents++;
+  }
+
   if (state.lastState !== enemy.state) {
-    if (enemy.state === 'attack') {
-      const strength = enemy.isBoss ? 1.9 : .72;
-      emitGroundDust(enemy.fx, enemy.position, strength, enemy.facing, 0);
-      if (enemy.isBoss) {
-        enemy.fx.burst(enemy.position.clone().add(new V(0, .35, 0)), 0xff9a67, 10, 3.1, 1.15);
-      }
-      manager.impactEvents++;
-    } else if (enemy.state === 'stagger') {
-      state.hitSign *= -1;
-    }
+    if (enemy.state === 'stagger') state.hitSign *= -1;
     state.lastState = enemy.state;
   }
 
