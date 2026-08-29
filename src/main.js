@@ -19,6 +19,7 @@ import { installFrameInvariantRowanTransitions } from './game/RowanTransitionGua
 import { installShowcaseQualityGate } from './game/ShowcaseQualityGate.js';
 import { installWorldExpansion } from './game/WorldExpansion.js';
 import { installWorldExpansionTerrain } from './game/WorldExpansionTerrain.js';
+import { installWorldExpansionRegionalLandmarks } from './game/WorldExpansionRegionalLandmarks.js';
 import { installWorldExpansionAtmosphere } from './game/WorldExpansionAtmosphere.js';
 import { installWorldExpansionNature } from './game/WorldExpansionNature.js';
 import { installWorldExpansionCollisionPolish } from './game/WorldExpansionCollisionPolish.js';
@@ -49,6 +50,7 @@ installFrameInvariantRowanTransitions(game, rowanAnimationDirector);
 installShowcaseQualityGate(game);
 installWorldExpansion(game);
 installWorldExpansionTerrain(game);
+installWorldExpansionRegionalLandmarks(game);
 installLandmarkSilhouettePolish(game);
 installWorldExpansionAtmosphere(game);
 installWorldExpansionCollisionPolish(game);
