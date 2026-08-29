@@ -138,7 +138,7 @@ function addGroundBreakup(root, high) {
     const z = THREE.MathUtils.lerp(route.az, route.bz, t) + nz * side;
     const scale = .35 + random() * 1.1;
 
-    dummy.position.set(x, .026, z);
+    dummy.position.set(x, .038, z);
     dummy.rotation.set(-Math.PI / 2, random() * Math.PI, 0);
     dummy.scale.set(scale * (1.3 + random() * 1.5), scale * (.45 + random() * .35), 1);
     dummy.updateMatrix();
@@ -189,8 +189,8 @@ export function installWorldExpansionTerrain(game) {
   for (const route of routes) {
     const common = { ax: route.ax, az: route.az, bx: route.bx, bz: route.bz, segments: high ? 16 : 11 };
     const floor = createTrailMesh({ ...common, width: route.floorWidth, jitter: 1.25, widthVariation: .11, seed: route.seed }, route.floor, -.055, `${route.key}_ForestFloor`);
-    const road = createTrailMesh({ ...common, width: route.roadWidth, jitter: route.jitter, widthVariation: .065, seed: route.seed ^ 0x11111111 }, route.road, .006, `${route.key}_Trail`);
-    const inlay = createTrailMesh({ ...common, width: route.inlayWidth, jitter: route.jitter * .45, widthVariation: .11, seed: route.seed ^ 0x22222222 }, stone, .024, `${route.key}_StoneInlay`);
+    const road = createTrailMesh({ ...common, width: route.roadWidth, jitter: route.jitter, widthVariation: .065, seed: route.seed ^ 0x11111111 }, route.road, .016, `${route.key}_Trail`);
+    const inlay = createTrailMesh({ ...common, width: route.inlayWidth, jitter: route.jitter * .45, widthVariation: .11, seed: route.seed ^ 0x22222222 }, stone, .032, `${route.key}_StoneInlay`);
     root.add(floor, road, inlay);
     manager.surfaces.push(floor, road, inlay);
   }
@@ -203,7 +203,7 @@ export function installWorldExpansionTerrain(game) {
 
   for (const destination of destinations) {
     const floor = createIrregularPatch({ x: destination.x, z: destination.z, radius: destination.floorRadius, variation: .075, segments: high ? 46 : 30, seed: destination.seed, y: -.06 }, destination.floor, `${destination.key}_ForestFloor`);
-    const clearing = createIrregularPatch({ x: destination.x, z: destination.z, radius: destination.roadRadius, variation: .032, segments: high ? 44 : 28, seed: destination.seed ^ 0x33333333, y: .004 }, destination.road, `${destination.key}_Clearing`);
+    const clearing = createIrregularPatch({ x: destination.x, z: destination.z, radius: destination.roadRadius, variation: .032, segments: high ? 44 : 28, seed: destination.seed ^ 0x33333333, y: .012 }, destination.road, `${destination.key}_Clearing`);
     root.add(floor, clearing);
     manager.surfaces.push(floor, clearing);
   }
@@ -215,7 +215,7 @@ export function installWorldExpansionTerrain(game) {
     [-19, -2, 6.6, roadWest, 0xA003],
   ];
   for (const [x, z, radius, material, seed] of transitions) {
-    const patch = createIrregularPatch({ x, z, radius, variation: .09, segments: high ? 28 : 20, seed, y: .008 }, material, 'WorldExpansion_GladeTransition');
+    const patch = createIrregularPatch({ x, z, radius, variation: .09, segments: high ? 28 : 20, seed, y: .018 }, material, 'WorldExpansion_GladeTransition');
     root.add(patch);
     manager.surfaces.push(patch);
   }
