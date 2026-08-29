@@ -292,7 +292,7 @@ export class Game {
 
       if (e.attackEvent && !this.player.dead) {
         const dist=e.position.distanceTo(this.player.position);
-        const hitRange=e.isBoss?4.35:1.75;
+        const hitRange=e.attackRange+(e.isBoss?.55:.3);
         if(dist<hitRange){
           if(this.player.takeDamage(e.damage,e.position)){
             this.ui.damageFlash.classList.add('hit');setTimeout(()=>this.ui.damageFlash.classList.remove('hit'),55);
