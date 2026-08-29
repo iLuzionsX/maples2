@@ -1,0 +1,29 @@
+{
+  "id": "combat-overhaul-k3",
+  "enabled": true,
+  "mode": "patch",
+  "task": "Rework Maples' combat, character action flow, animation feel, enemy combat readability, audiovisual hit feedback, and mobile combat feel into a production-quality commercial-indie action RPG pass. This is not a cosmetic-only pass. Treat the supplied current files as authoritative and preserve unrelated game/world/UI behavior.\n\nGoals, in priority order:\n1. Make Rowan's melee combat immediately more responsive and intentional: reliable input buffering, a satisfying three-hit chain, deliberate startup/active/recovery timing, clean combo reset rules, sensible attack movement/lunge, dodge cancel windows, and no duplicate hit events. Real-time cooldown/input semantics must not break under hit-stop.\n2. Eliminate split/contradictory action authority where practical within these existing files. Game should resolve world hits/projectiles; Character/animation code should own character state/presentation. Preserve public compatibility surfaces relied on by the existing polish/animation/performance layers. Do not add new files.\n3. Upgrade animation feel substantially using the existing Rowan animation stack and procedural fallback: anticipation, weight transfer, follow-through, recovery, locomotion-to-combat transitions, dodge silhouette, hit reaction, and combo differentiation. Avoid two systems fighting over the same transforms/clips. Preserve the GLB animation pipeline and procedural fallback.\n4. Improve combat readability and enemy/boss fairness: clear windup -> active strike -> recovery cadence, facing/telegraph consistency, stagger/hit reaction that cannot soft-lock enemies, boss attacks that feel heavier without unfair unavoidable damage, and correct enemy orientation. Do not replace the Enemy FSM wholesale.\n5. Make hit confirmation feel premium but restrained: attack-tier-specific hit-stop, camera impulse/shake, slash/burst/ring effects, damage reaction, audio layering/pitch variation, projectile impact, dodge trail. Effects must correspond to real mechanics; do not fake extra hits.\n6. Preserve desktop and mobile controls. Attack tapping/holding, dodge/spell buttons, simultaneous movement + combat, camera behavior, pointer-lock lifecycle, touch dragging, and 44px+ touch affordances must not regress. Do not turn mobile combat into auto-play.\n7. Keep performance reasonable: avoid per-frame geometry/material creation and avoid unnecessary hot-loop allocations when easily preventable. Preserve quality scaling and existing PerformanceExtensions/Showcase integrations.\n8. Preserve encounter progression, XP/loot, HUD contracts, world collision, spawning, and current assets unless a small combat-facing compatibility change is required. Modest combat-value tuning is allowed when it materially improves feel, but do not inflate power or trivialize the boss.\n9. Do not weaken or delete existing tests. If you touch supplied tests, only strengthen them for the new behavior.\n\nImportant existing constraints: current main is 9ca6184666ece3728f2d23c4def0c63fd68c9c7e; the old unmerged unified-action PR is only historical reference and must not be assumed current. The final patch must apply cleanly to this delegated checkout, change only selected existing files, and remain browser-native Three.js JavaScript. Return a canonical unified diff only.",
+  "files": [
+    "src/game/Game.js",
+    "src/game/Character.js",
+    "src/game/Enemy.js",
+    "src/game/AnimationPolish.js",
+    "src/game/RowanAnimationDirector.js",
+    "src/game/RowanTransitionGuard.js",
+    "src/game/Enhancements.js",
+    "src/game/FX.js",
+    "src/game/Audio.js",
+    "src/game/Input.js",
+    "src/game/ShowcasePass.js",
+    "src/main.js",
+    "tests/enemy-facing-unit.mjs",
+    "tests/rowan-animation-unit.mjs",
+    "tests/rowan-animation-e2e.mjs",
+    "tests/movement-unit.mjs",
+    "tests/movement-e2e.mjs",
+    "tests/visual-smoke.mjs"
+  ],
+  "model": "moonshotai/kimi-k3",
+  "reasoning_effort": "max",
+  "max_tokens": 64000
+}
