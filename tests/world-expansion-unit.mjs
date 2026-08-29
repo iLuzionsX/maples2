@@ -3,6 +3,7 @@ import {
   clampPointToTravelNetwork,
   pointInZone,
   applyCircularBlockers,
+  applyEnvironmentBlockers,
 } from '../src/game/WorldExpansionMath.js';
 import { installWorldTravelAuthority } from '../src/game/WorldTravelAuthority.js';
 
@@ -25,6 +26,8 @@ assert.ok(inside(-46, -20), 'Briarwatch Trail must be traversable');
 const farOutside = clampPointToTravelNetwork(180, 180, REGIONS);
 assert.equal(farOutside.clamped, true);
 assert.ok(inside(farOutside.x, farOutside.z), 'clamping must return points to the travel network');
+const clampedAgain = clampPointToTravelNetwork(farOutside.x, farOutside.z, REGIONS);
+assert.equal(clampedAgain.clamped, false, 'a clamped boundary point must be stable on the next frame');
 
 const validOuterPoint = clampPointToTravelNetwork(5, 70, REGIONS);
 assert.equal(validOuterPoint.clamped, false, 'valid outer movement must not be clamped back into the glade');
@@ -33,7 +36,18 @@ assert.deepEqual([validOuterPoint.x, validOuterPoint.z], [5, 70]);
 const blocker = { x: 70.7, z: 19.5, radius: 6.15 };
 const pushed = applyCircularBlockers(blocker.x, blocker.z, [blocker], .34);
 assert.equal(pushed.pushed, true);
-assert.ok(Math.hypot(pushed.x - blocker.x, pushed.z - blocker.z) >= 6.489, 'blockers must push the player outside occupied geometry');
+assert.ok(Math.hypot(pushed.x - blocker.x, pushed.z - blocker.z) >= 6.489, 'circular blockers must push the player outside occupied geometry');
+
+const ellipse = { type: 'ellipse', x: 10, z: 8, radiusX: 8, radiusZ: 5, rotation: 0 };
+const ellipseCenter = applyEnvironmentBlockers(10, 8, [ellipse], .34);
+assert.equal(ellipseCenter.pushed, true, 'ellipse blocker must reject its center');
+const ellipseNorm = Math.hypot(
+  (ellipseCenter.x - ellipse.x) / (ellipse.radiusX + .34),
+  (ellipseCenter.z - ellipse.z) / (ellipse.radiusZ + .34),
+);
+assert.ok(ellipseNorm >= .999999, `ellipse push must land on the padded shoreline, got ${ellipseNorm}`);
+const ellipseStable = applyEnvironmentBlockers(ellipseCenter.x, ellipseCenter.z, [ellipse], .34);
+assert.equal(ellipseStable.pushed, false, 'ellipse boundary must not repush every frame');
 
 const playerPosition = { x: 0, z: 0 };
 const enemyPosition = { x: 60, z: 0 };
