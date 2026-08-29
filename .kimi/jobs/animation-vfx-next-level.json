@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "animation-vfx-next-level",
+  "enabled": true,
+  "mode": "implementation",
+  "objective": "Take Maples' character animation presentation, particles, weapon trails, spell/projectile effects, impact feedback, dodge/locomotion accents, and supporting VFX to a commercial-indie showcase level without changing gameplay authority or combat balance. Build one coherent production-quality patch rather than isolated gimmicks.",
+  "role": "principal real-time character animation and VFX engineer specializing in Three.js action games, combat readability, motion feel, GPU-conscious particles, and premium indie presentation",
+  "allowed_files": [
+    "src/game/RowanAnimationDirector.js",
+    "src/game/AnimationPolish.js",
+    "src/game/FX.js",
+    "src/game/Enhancements.js",
+    "tests/rowan-animation-unit.mjs"
+  ],
+  "relevant_context": "Maples is an original Three.js browser action-RPG targeting commercial-indie quality on desktop and mobile. Existing Character/Game action timing remains authoritative; animation and VFX must consume real state/events and must never invent damage windows, hits, cooldowns, or competing action clocks. Preserve existing imported GLB clip selection, foot IK, Rowan rig compatibility, public APIs, camera/mobile controls, combat values, asset licensing, and working performance systems. Current code already has authored locomotion blending, attack pose layers, secondary cape/hair motion, a weapon ribbon, ground dust, layered slash effects, burst/ring/dash/projectile/heal/level-up FX. Improve and integrate those systems rather than replacing them blindly. Favor readable physical motion: anticipation -> acceleration -> contact -> follow-through -> recovery. Effects should reinforce real events, with restrained hierarchy and a clearly stronger third-hit finisher. Avoid generic screen-filling magic, excessive bloom, visual noise, or effects that obscure enemies. Use reusable geometry/materials and bounded/pool-like behavior where practical; avoid new allocations in hot per-frame loops and avoid one material per particle when a shared material or lightweight approach is viable. Respect reduced mobile budgets and keep low-quality mode visually coherent rather than simply deleting feedback.",
+  "acceptance_criteria": [
+    "Rowan locomotion feels less robotic through better start/stop/turn inertia, weight transfer, and transition posing while retaining the existing clip blend architecture",
+    "All three melee swings read distinctly, with stronger anticipation/acceleration/follow-through and a visibly heavier third-hit finisher while preserving authoritative gameplay timing",
+    "Dodge, hurt, cast, cape/hair secondary motion, weapon glow, and transitions back to locomotion are materially more polished without rig drift or competing animation state",
+    "Weapon trails and slash effects have clearer shape, temporal taper, layered core/glow/edge hierarchy, and combo-specific identity without obscuring targets",
+    "Hit bursts, dash trails, projectile trails/impacts, healing, level-up, and locomotion dust gain depth, directional motion, and softer particle language instead of hard primitive spam",
+    "Particle/VFX lifetime and active-count behavior is bounded and performance-conscious; hot update paths avoid obvious avoidable allocations and resource leaks",
+    "No gameplay values, damage windows, enemy AI, movement authority, camera behavior, input behavior, UI contracts, or asset licensing are changed",
+    "Desktop and mobile remain readable; the patch should not rely on expensive postprocessing, new external assets, or high particle counts to look good",
+    "Existing public methods and test contracts remain compatible, and any test additions validate behavior rather than implementation trivia",
+    "Return only an allowlisted, apply-clean unified diff and explicitly avoid unrelated refactors"
+  ],
+  "commands": [
+    "npm run test:animation:unit",
+    "npm run test:movement:unit",
+    "npm run test:mobile:unit",
+    "npm run build"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 18,
+  "max_tokens": 56000,
+  "timeout_ms": 720000,
+  "max_changed_files": 5,
+  "max_patch_bytes": 262144,
+  "retries": 3,
+  "stream": true
+}
