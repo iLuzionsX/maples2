@@ -17,6 +17,15 @@ function assertInsideNetwork(x, z, message) {
   assert.ok(WORLD_EXPANSION_REGIONS.some(zone => pointInZone(x, z, zone)), message);
 }
 
+function assertContinuousLine(ax, az, bx, bz, steps, message) {
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = ax + (bx - ax) * t;
+    const z = az + (bz - az) * t;
+    assertInsideNetwork(x, z, `${message} at t=${t.toFixed(2)} (${x.toFixed(2)}, ${z.toFixed(2)})`);
+  }
+}
+
 assertInsideNetwork(0, 0, 'combat glade must remain in the player travel network');
 assertInsideNetwork(4, 60, 'Hollowroad must be continuously traversable');
 assertInsideNetwork(52, 13, 'Glassmere path must be continuously traversable');
@@ -24,6 +33,10 @@ assertInsideNetwork(-46, -20, 'Briarwatch trail must be continuously traversable
 assertInsideNetwork(7, 88, 'Hollowroad Crossing destination must be traversable');
 assertInsideNetwork(66, 16, 'Glassmere Fen destination must be traversable');
 assertInsideNetwork(-64, -32, 'Briarwatch Rise destination must be traversable');
+
+assertContinuousLine(0, 20, 6, 78, 48, 'Hollowroad cannot contain a travel gap');
+assertContinuousLine(20, 4, 64, 16, 40, 'Glassmere Path cannot contain a travel gap');
+assertContinuousLine(-19, -2, -62, -31, 40, 'Briarwatch Trail cannot contain a travel gap');
 
 const farOutside = clampPointToTravelNetwork(180, 180, WORLD_EXPANSION_REGIONS);
 assert.equal(farOutside.clamped, true, 'far-off points must clamp back to the authored network');
