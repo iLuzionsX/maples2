@@ -27,6 +27,22 @@ export function normalizePatchOutput(output, maxBytes = MAX_PATCH_BYTES) {
   return `${text}\n`;
 }
 
+export function normalizeCssOverrideOutput(output, maxBytes = MAX_PATCH_BYTES) {
+  let text = String(output ?? '').replace(/\r\n/g, '\n').trim();
+  const fence = text.match(/^\`\`\`(?:css)?\s*\n([\s\S]*?)\n\`\`\`$/i);
+  if (fence) text = fence[1].trim();
+  if (!text || /\`\`\`/.test(text) || /<\/?(?:script|style|link|iframe|object|embed)\b/i.test(text) || /@import\b/i.test(text) || /\burl\s*\(/i.test(text) || /\bexpression\s*\(/i.test(text) || /javascript\s*:/i.test(text)) throw new Error('Kimi CSS output is unsafe or malformed.');
+  let depth = 0;
+  let sawBlock = false;
+  for (const char of text.replace(/\/\*[\s\S]*?\*\//g, '')) {
+    if (char === '{') { depth += 1; sawBlock = true; }
+    if (char === '}') { depth -= 1; if (depth < 0) throw new Error('Kimi CSS output has unbalanced braces.'); }
+  }
+  if (!sawBlock || depth !== 0) throw new Error('Kimi CSS output is not structurally valid.');
+  if (Buffer.byteLength(text, 'utf8') > maxBytes) throw new Error(`Kimi CSS output exceeds ${maxBytes} bytes.`);
+  return `${text}\n`;
+}
+
 export function extractPatchPaths(output) {
   const text = normalizePatchOutput(output);
   const paths = new Set();
@@ -87,6 +103,12 @@ export function verifyPatchApplies(output, rootDir) {
 }
 
 export function validatePatch(job, output, rootDir = '') {
+  if (job.legacyMode === 'css-override') {
+    if (job.allowedFiles.length !== 1 || !job.allowedFiles[0].endsWith('.css')) throw new Error(`${job.id}: css-override requires one .css file.`);
+    const css = normalizeCssOverrideOutput(output, job.maxPatchBytes);
+    if (redactSecrets(css) !== css) throw new Error('Kimi CSS output contains secret-shaped content and was rejected.');
+    return { patch: css, changedFiles: [job.allowedFiles[0]], format: 'css_override' };
+  }
   const checked = verifyPatchScope(job, output);
   if (redactSecrets(checked.patch) !== checked.patch) throw new Error('Kimi patch contains secret-shaped content and was rejected.');
   if (rootDir) verifyPatchApplies(checked.patch, rootDir);

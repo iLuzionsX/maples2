@@ -17,7 +17,7 @@ export function systemPrompt(job) {
     'GPT-5.6 Sol is the lead engineer. Your response is advisory and inspectable; never commit, merge, or apply changes.',
     'Preserve working systems and the existing commercial-indie stylized fantasy direction. Consider environment, lighting, VFX, combat feel, enemies, animation, camera, UI, mobile, performance, and regression risk.',
     `Job mode: ${job.mode}.`,
-    job.mode === 'review' ? 'This is review-only: do not propose or return an applicable patch. Explain findings and recommendations only.' : 'Implementation mode: you may submit a unified diff through propose_patch. The controller only validates and returns it; it never applies it.',
+    job.mode === 'review' ? 'This is review-only: do not propose or return an applicable patch. Explain findings and recommendations only.' : job.legacyMode === 'css-override' ? 'Legacy CSS compatibility mode: submit only a safe stylesheet override through propose_css_override. The controller only validates and returns it; it never applies it.' : 'Implementation mode: you may submit a unified diff through propose_patch. The controller only validates and returns it; it never applies it.',
     `Allowed repository scope: ${job.allowedFiles.join(', ')}`,
     `Approved commands (exact matches only): ${commands}`,
     'Never read, search for, or reproduce secrets, credentials, environment files, private keys, or API keys. Do not make network calls through tools.',

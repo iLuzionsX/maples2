@@ -146,6 +146,13 @@ export class RepoPolicy {
     this.proposed = checked;
     return { accepted: true, changedFiles: checked.changedFiles, bytes: Buffer.byteLength(checked.patch, 'utf8'), appliesCleanly: true };
   }
+
+  proposeCssOverride(output) {
+    if (this.job.mode !== 'implementation' || this.job.legacyMode !== 'css-override') throw new Error('CSS overrides are available only for legacy css-override jobs.');
+    const checked = validatePatch(this.job, output, this.rootDir);
+    this.proposed = checked;
+    return { accepted: true, changedFiles: checked.changedFiles, bytes: Buffer.byteLength(checked.patch, 'utf8'), appliesCleanly: false };
+  }
 }
 
 function tokenize(command) {

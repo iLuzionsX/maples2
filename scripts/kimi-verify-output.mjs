@@ -20,7 +20,7 @@ export function verifyArtifact(job, result, rootDir) {
   if (!result || result.job_id !== job.id || result.mode !== job.mode) throw new Error(`${job.id}: result metadata mismatch.`);
   if (result.status === 'completed' && job.mode === 'implementation' && result.patch?.content) {
     const checked = validatePatch(job, result.patch.content, rootDir);
-    result.patch = { ...result.patch, format: 'unified_diff', content: checked.patch, changed_files: checked.changedFiles, sha256: crypto.createHash('sha256').update(checked.patch).digest('hex') };
+    result.patch = { ...result.patch, format: checked.format || 'unified_diff', content: checked.patch, changed_files: checked.changedFiles, sha256: crypto.createHash('sha256').update(checked.patch).digest('hex') };
     result.files_proposed_for_change = checked.changedFiles;
   } else if (job.mode === 'review' && result.patch != null) {
     throw new Error(`${job.id}: review-only result contains an applicable patch.`);

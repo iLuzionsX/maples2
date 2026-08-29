@@ -10,9 +10,11 @@ export const TOOL_DEFINITIONS = [
 ];
 
 const PATCH_TOOL = { type: 'function', function: { name: 'propose_patch', description: 'Submit a unified diff for validation. It is never applied, committed, or merged by this agent.', parameters: { type: 'object', properties: { patch: { type: 'string' } }, required: ['patch'], additionalProperties: false } } };
+const CSS_TOOL = { type: 'function', function: { name: 'propose_css_override', description: 'Submit a safe CSS override for the legacy Netlify compatibility path. It is never applied automatically.', parameters: { type: 'object', properties: { css: { type: 'string' } }, required: ['css'], additionalProperties: false } } };
 
 export function toolDefinitionsFor(job) {
-  return job.mode === 'implementation' ? [...TOOL_DEFINITIONS, PATCH_TOOL] : TOOL_DEFINITIONS;
+  if (job.mode !== 'implementation') return TOOL_DEFINITIONS;
+  return [...TOOL_DEFINITIONS, job.legacyMode === 'css-override' ? CSS_TOOL : PATCH_TOOL];
 }
 
 export async function dispatchTool(policy, name, rawArguments) {
@@ -27,6 +29,7 @@ export async function dispatchTool(policy, name, rawArguments) {
     else if (name === 'git_diff') result = policy.diff(Boolean(args.staged));
     else if (name === 'run_approved_command') result = await policy.runApproved(args.command);
     else if (name === 'propose_patch') result = policy.proposePatch(args.patch);
+    else if (name === 'propose_css_override') result = policy.proposeCssOverride(args.css);
     else return { ok: false, error: `Unknown tool: ${name}` };
     return { ok: true, result };
   } catch (error) {

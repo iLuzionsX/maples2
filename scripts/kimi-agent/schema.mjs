@@ -101,7 +101,7 @@ export function validateJob(raw, fileName = 'job.json') {
   if (!allowedFiles.length || allowedFiles.some(file => !file || isSecretPath(file))) throw new Error(`${fileName}: valid non-secret allowed_files are required`);
   if (new Set(allowedFiles).size !== allowedFiles.length) throw new Error(`${fileName}: allowed_files must be unique`);
 
-  const legacyMode = raw.mode;
+  const legacyMode = raw.mode || (raw.task || raw.files ? 'patch' : null);
   const mode = legacyMode === 'patch' || legacyMode === 'css-override'
     ? 'implementation'
     : JOB_MODES.has(legacyMode) ? legacyMode : 'review';

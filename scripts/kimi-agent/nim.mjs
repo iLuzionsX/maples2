@@ -126,7 +126,10 @@ export class NvidiaNimClient {
       temperature,
       stream: Boolean(stream),
     };
-    if (tools.length) body.tools = tools;
+    if (tools.length) {
+      body.tools = tools;
+      body.tool_choice = 'auto';
+    }
     let lastError;
     for (let attempt = 0; attempt <= retries; attempt += 1) {
       if (signal?.aborted) throw new KimiError('CANCELLED', 'Kimi session cancelled.');

@@ -5,11 +5,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { validateJob, pathIsAllowed } from '../scripts/kimi-agent/schema.mjs';
-import { verifyPatchScope } from '../scripts/kimi-agent/patch.mjs';
+import { validatePatch, verifyPatchScope } from '../scripts/kimi-agent/patch.mjs';
 import { RepoPolicy } from '../scripts/kimi-agent/policy.mjs';
 import { NvidiaNimClient, KimiError } from '../scripts/kimi-agent/nim.mjs';
 import { runDelegatedSession } from '../scripts/kimi-agent/session.mjs';
 import { redactSecrets } from '../scripts/kimi-agent/security.mjs';
+import { toolDefinitionsFor } from '../scripts/kimi-agent/tools.mjs';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'maples-kimi-agent-'));
 fs.mkdirSync(path.join(root, 'src'), { recursive: true });
@@ -32,6 +33,12 @@ assert.equal(pathIsAllowed('src', ['src/']), true);
 assert.throws(() => validateJob({ id: 'bad', objective: 'x', allowed_files: ['.env'] }), /non-secret/);
 assert.throws(() => validateJob({ id: 'latest', objective: 'x', allowed_files: ['src/app.js'] }), /reserved/);
 assert.throws(() => validateJob({ id: 'bad-command', objective: 'x', allowed_files: ['src/app.js'], commands: ['npm run build && curl https://bad'] }), /forbidden shell/);
+const legacyPatchJob = validateJob({ id: 'legacy-patch', task: 'x', files: ['src/app.js'], mode: 'patch' });
+assert.equal(legacyPatchJob.mode, 'implementation');
+const cssJob = validateJob({ id: 'legacy-css', task: 'x', files: ['src/app.css'], mode: 'css-override' });
+assert.equal(cssJob.legacyMode, 'css-override');
+assert.equal(toolDefinitionsFor(cssJob).at(-1).function.name, 'propose_css_override');
+assert.equal(validatePatch(cssJob, '.hud { color: red; }').format, 'css_override');
 
 const literalPathJob = validateJob({ id: 'literal-path', mode: 'implementation', objective: 'x', allowed_files: ['a/foo'] });
 const literalPatch = 'diff --git a/a/foo b/a/foo\n--- a/a/foo\n+++ b/a/foo\n@@ -1 +1 @@\n-old\n+new\n';
@@ -47,6 +54,7 @@ const server = http.createServer((request, response) => {
   request.on('end', () => {
     requestCount += 1;
     const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    assert.equal(body.tool_choice, 'auto');
     const hasToolResult = body.messages.some(message => message.role === 'tool');
     const hasFollowUp = body.messages.some(message => message.role === 'user' && String(message.content).includes('FOLLOW-UP REQUEST'));
     response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8' });

@@ -31,7 +31,7 @@ export function buildResult({ job, sessionId, assistantText, policy, toolEvents,
   if (job.mode === 'implementation' && patchText) {
     try {
       const checked = policy.proposed || validatePatch(job, patchText, policy.rootDir);
-      patch = { format: 'unified_diff', content: checked.patch, changed_files: checked.changedFiles, sha256: crypto.createHash('sha256').update(checked.patch).digest('hex') };
+      patch = { format: checked.format || 'unified_diff', content: checked.patch, changed_files: checked.changedFiles, sha256: crypto.createHash('sha256').update(checked.patch).digest('hex') };
     } catch (patchError) {
       unresolved.push(`Patch was rejected by scope validation: ${String(patchError.message).slice(0, 500)}`);
     }
