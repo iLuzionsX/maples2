@@ -6,6 +6,10 @@ import {
   pulseAmount,
   stanceWeight,
 } from '../src/game/RowanAnimationMath.js';
+import {
+  attackMotionProfile,
+  effectBudgetForQuality,
+} from '../src/game/AnimationVFXNextLevel.js';
 
 for (const speed of [0, .2, .7, 1.8, 3.1, 4.4, 5.25]) {
   const weights = locomotionWeights(speed, 5.25, .35);
@@ -37,5 +41,21 @@ assert.ok(front.front > .99 && Math.abs(front.side) < .001, 'front hit classifie
 const right = localHitResponse(0, 1, 0, 0, 0);
 assert.ok(right.side > .99 && Math.abs(right.front) < .001, 'right-side hit classifies as right');
 
-console.log('Rowan animation math: PASS');
-// Diagnostic Netlify A/B retrigger after the strict current-head failure.
+for (let combo = 0; combo < 3; combo++) {
+  const early = attackMotionProfile(.04, combo);
+  const contact = attackMotionProfile(attackMotionProfile(.5, combo).contact, combo);
+  const late = attackMotionProfile(.96, combo);
+  assert.ok(early.anticipation > .8, `combo ${combo + 1} has a readable anticipation phase`);
+  assert.ok(contact.strike > .98, `combo ${combo + 1} peaks at its authored contact phase`);
+  assert.ok(late.recovery > .8, `combo ${combo + 1} resolves into recovery`);
+}
+
+const firstContact = attackMotionProfile(.5, 0).contact;
+const secondContact = attackMotionProfile(.5, 1).contact;
+const finisherContact = attackMotionProfile(.5, 2).contact;
+assert.notEqual(firstContact, secondContact, 'opening swings keep distinct timing identities');
+assert.ok(finisherContact > firstContact, 'the finisher carries a deliberately longer commitment before contact');
+assert.equal(effectBudgetForQuality('high'), 1, 'high quality keeps the full authored VFX budget');
+assert.ok(effectBudgetForQuality('low') < 1 && effectBudgetForQuality('low') > .5, 'low quality retains readable effects at a bounded particle budget');
+
+console.log('Rowan animation math and VFX profiles: PASS');
