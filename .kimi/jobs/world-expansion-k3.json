@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "world-expansion-k3",
-  "enabled": true,
+  "enabled": false,
   "mode": "implementation",
   "objective": "Design a production-quality high-effort Maples world expansion using the current compact glade as the protected combat core. Propose a scoped patch that adds authored traversable geography, stronger distant composition, richer material response, denser micro-detail, environmental storytelling, and GPU-conscious procedural set dressing. Translate lessons from modern open-world rendering analysis into techniques suitable for a Three.js browser game: layered depth, selective reflective/wet materials, soft atmospheric separation, landmark silhouettes, dense-but-instanced detail, and intentional lighting contrast. Do not imitate GTA assets, locations, branding, or art direction. Preserve existing enemy containment, combat values, camera/mobile controls, UI, animation, licensed assets, and the current performance passes. Favor reusable procedural asset builders and explicit metadata for future collision/LOD integration.",
   "role": "principal Three.js world/environment engineer and technical art lead",
