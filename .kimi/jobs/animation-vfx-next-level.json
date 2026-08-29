@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "animation-vfx-next-level",
-  "enabled": true,
+  "enabled": false,
   "mode": "implementation",
   "objective": "Take Maples' character animation presentation, particles, weapon trails, spell/projectile effects, impact feedback, dodge/locomotion accents, and supporting VFX to a commercial-indie showcase level without changing gameplay authority or combat balance. Build one coherent production-quality patch rather than isolated gimmicks.",
   "role": "principal real-time character animation and VFX engineer specializing in Three.js action games, combat readability, motion feel, GPU-conscious particles, and premium indie presentation",
