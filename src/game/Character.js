@@ -5,9 +5,9 @@ const clamp = THREE.MathUtils.clamp;
 const damp = THREE.MathUtils.damp;
 
 const ATTACK_SPECS = [
-  { duration:.38, activeStart:.30, activeEnd:.58, recoveryStart:.64, move:.42, commit:1.15 },
-  { duration:.42, activeStart:.28, activeEnd:.57, recoveryStart:.62, move:.36, commit:1.35 },
-  { duration:.58, activeStart:.46, activeEnd:.72, recoveryStart:.74, move:.14, commit:1.8 },
+  { duration:.38, activeStart:.30, activeEnd:.58, recoveryStart:.64, bufferStart:.46, move:.42, commit:1.15 },
+  { duration:.42, activeStart:.28, activeEnd:.57, recoveryStart:.62, bufferStart:.46, move:.36, commit:1.35 },
+  { duration:.58, activeStart:.46, activeEnd:.72, recoveryStart:.74, bufferStart:.54, move:.14, commit:1.8 },
 ];
 
 function std(color, rough=.75, metal=.0, emissive=0, ei=0){
@@ -26,7 +26,7 @@ export class Character {
     this.level=7;this.xp=0;this.xpToLevel=100;
     this.state='idle';this.stateTime=0;this.stateDuration=0;
     this.invuln=0;this.comboIndex=0;this.attackEventFired=false;this.dodgeDir=new V();
-    this.attackFacing=0;this.hitFlash=0;this.dead=false;
+    this.attackFacing=0;this.attackBuffer=0;this.comboTimer=0;this.hitFlash=0;this.dead=false;
     this._build();
   }
 
@@ -101,6 +101,21 @@ export class Character {
     return 'recovery';
   }
 
+  requestAttack(){
+    if(this.dead || this.state==='dodge' || this.state==='hurt' || this.state==='cast')return false;
+    if(this.state==='idle')return this._startNextAttack();
+    if(this.state==='attack' && this.attackProgress>=ATTACK_SPECS[this.comboIndex].bufferStart){
+      this.attackBuffer=.18;return true;
+    }
+    return false;
+  }
+
+  _startNextAttack(){
+    const combo=this.comboTimer>0?(this.comboIndex+1)%3:0;
+    this.attackBuffer=0;
+    return this.beginAttack(combo);
+  }
+
   beginAttack(combo){
     if(this.dead || this.state==='dodge' || this.state==='hurt' || this.state==='cast') return false;
     this.state='attack';this.stateTime=0;this.comboIndex=((combo%3)+3)%3;this.attackEventFired=false;
@@ -115,6 +130,7 @@ export class Character {
       const spec=ATTACK_SPECS[this.comboIndex];
       if(this.attackProgress<spec.recoveryStart)return false;
     }
+    this.attackBuffer=0;
     this.state='dodge';this.stateTime=0;this.stateDuration=.44;this.invuln=.40;
     this.dodgeDir.copy(moveDir);
     if(this.dodgeDir.lengthSq()<.01) this.dodgeDir.set(Math.sin(this.facing),0,Math.cos(this.facing));
@@ -125,6 +141,7 @@ export class Character {
 
   takeDamage(amount, from){
     if(this.invuln>0 || this.dead) return false;
+    this.attackBuffer=0;this.comboTimer=0;
     this.hp=Math.max(0,this.hp-amount);this.invuln=.52;this.hitFlash=.18;
     this.audio.hurt();
     if(from){ const away=this.position.clone().sub(from);away.y=0;if(away.lengthSq()>.01)this.velocity.add(away.normalize().multiplyScalar(3.2)); }
@@ -143,9 +160,10 @@ export class Character {
     return leveled;
   }
 
-  update(dt, move, cameraYaw){
+  update(dt, move, cameraYaw, realDt=dt){
     this.invuln=Math.max(0,this.invuln-dt);this.hitFlash=Math.max(0,this.hitFlash-dt);
     this.mana=Math.min(this.maxMana,this.mana+dt*8);
+    this.comboTimer=Math.max(0,this.comboTimer-realDt);this.attackBuffer=Math.max(0,this.attackBuffer-realDt);
     this.stateTime+=dt;
 
     const forward=new V(Math.sin(cameraYaw),0,Math.cos(cameraYaw));
@@ -187,7 +205,11 @@ export class Character {
     this.root.rotation.y=this.facing;
     this.speed=Math.hypot(this.velocity.x,this.velocity.z);
 
-    if(['attack','dodge','hurt'].includes(this.state) && this.stateTime>=this.stateDuration){this.state='idle';this.stateTime=0;}
+    if(['attack','dodge','hurt'].includes(this.state) && this.stateTime>=this.stateDuration){
+      if(this.state==='attack')this.comboTimer=.58;
+      this.state='idle';this.stateTime=0;
+    }
+    if(this.state==='idle' && this.attackBuffer>0)this._startNextAttack();
     this._animate(dt);
   }
 
