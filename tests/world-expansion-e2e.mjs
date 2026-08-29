@@ -61,11 +61,13 @@ if (!startup.expansionNatureReady || startup.expansionNatureCount < minimumNatur
   errors.push(`expanded nature pipeline not ready/reused: ${JSON.stringify(startup)}`);
 }
 
+// These are intentionally clear traversal samples. Obstacle rejection is verified
+// separately below, so a valid Waystone collision cannot masquerade as a route failure.
 const locations = [
   { key: 'hollowroad', x: 5, z: 70, yaw: Math.PI },
   { key: 'hollowroad-crossing', x: 7, z: 82, yaw: Math.PI * .9 },
-  { key: 'glassmere', x: 57, z: 14, yaw: Math.PI * .55 },
-  { key: 'briarwatch', x: -55, z: -26, yaw: Math.PI * 1.35 },
+  { key: 'glassmere', x: 52, z: 13, yaw: Math.PI * .55 },
+  { key: 'briarwatch', x: -46, z: -20, yaw: Math.PI * 1.35 },
 ];
 
 for (const location of locations) {
@@ -115,6 +117,16 @@ const invariants = await page.evaluate(() => {
     (game.player.position.z - water.z) / (water.radiusZ + .34),
   );
 
+  const waystone = game.worldExpansionCollisionPolish.landmarkBlockers.find(blocker => String(blocker.source).includes('Waystone'));
+  let waystoneDistance = null;
+  let waystoneRequired = null;
+  if (waystone) {
+    game.player.position.set(waystone.x, 0, waystone.z);
+    game.world.clampToArena(game.player.position);
+    waystoneDistance = Math.hypot(game.player.position.x - waystone.x, game.player.position.z - waystone.z);
+    waystoneRequired = waystone.radius + .34;
+  }
+
   game.player.position.set(180, 0, 180);
   game.world.clampToArena(game.player.position);
   const firstBoundary = game.player.position.clone();
@@ -124,6 +136,8 @@ const invariants = await page.evaluate(() => {
   return {
     enemyRadius,
     waterNorm,
+    waystoneDistance,
+    waystoneRequired,
     boundaryDelta,
     authority: {
       playerClampCalls: game.worldTravelAuthority?.playerClampCalls || 0,
@@ -134,6 +148,9 @@ const invariants = await page.evaluate(() => {
 
 if (invariants.enemyRadius != null && invariants.enemyRadius > 28.001) errors.push(`enemy escaped encounter bubble: r=${invariants.enemyRadius}`);
 if (invariants.waterNorm < .999) errors.push(`player remained inside Glassmere water ellipse: norm=${invariants.waterNorm}`);
+if (invariants.waystoneDistance != null && invariants.waystoneDistance + 1e-5 < invariants.waystoneRequired) {
+  errors.push(`player remained inside Waystone collider: ${JSON.stringify(invariants)}`);
+}
 if (invariants.boundaryDelta > 1e-5) errors.push(`world-boundary clamp is not stable: delta=${invariants.boundaryDelta}`);
 if (invariants.authority.playerClampCalls < 1 || invariants.authority.encounterClampCalls < 1) {
   errors.push(`travel authority did not exercise both paths: ${JSON.stringify(invariants.authority)}`);
