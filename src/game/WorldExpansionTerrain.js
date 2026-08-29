@@ -139,7 +139,7 @@ function addGroundBreakup(root, high) {
     const scale = .35 + random() * 1.1;
 
     dummy.position.set(x, .026, z);
-    dummy.rotation.set(-Math.PI / 2, 0, random() * Math.PI);
+    dummy.rotation.set(-Math.PI / 2, random() * Math.PI, 0);
     dummy.scale.set(scale * (1.3 + random() * 1.5), scale * (.45 + random() * .35), 1);
     dummy.updateMatrix();
     patches.setMatrixAt(i, dummy.matrix);
