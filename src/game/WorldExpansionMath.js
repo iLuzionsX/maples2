@@ -102,6 +102,39 @@ export function pushPointOutsideCircle(x, z, blocker, padding = 0) {
   };
 }
 
+export function pushPointOutsideEllipse(x, z, blocker, padding = 0) {
+  const radiusX = Math.max(EPSILON, blocker.radiusX + padding);
+  const radiusZ = Math.max(EPSILON, blocker.radiusZ + padding);
+  const rotation = blocker.rotation || 0;
+  const cos = Math.cos(rotation);
+  const sin = Math.sin(rotation);
+  const dx = x - blocker.x;
+  const dz = z - blocker.z;
+
+  // Rotate into the ellipse's local frame. The normalized radius is 1.0 on the edge.
+  const localX = dx * cos + dz * sin;
+  const localZ = -dx * sin + dz * cos;
+  const normalized = Math.hypot(localX / radiusX, localZ / radiusZ);
+  if (normalized + EPSILON >= 1) return { x, z, pushed: false };
+
+  let targetX;
+  let targetZ;
+  if (normalized <= EPSILON) {
+    targetX = radiusX;
+    targetZ = 0;
+  } else {
+    const scale = 1 / normalized;
+    targetX = localX * scale;
+    targetZ = localZ * scale;
+  }
+
+  return {
+    x: blocker.x + targetX * cos - targetZ * sin,
+    z: blocker.z + targetX * sin + targetZ * cos,
+    pushed: true,
+  };
+}
+
 export function applyCircularBlockers(x, z, blockers, padding = 0) {
   let px = x;
   let pz = z;
@@ -112,5 +145,22 @@ export function applyCircularBlockers(x, z, blockers, padding = 0) {
     pz = result.z;
     pushed ||= result.pushed;
   }
+  return { x: px, z: pz, pushed };
+}
+
+export function applyEnvironmentBlockers(x, z, blockers, padding = 0) {
+  let px = x;
+  let pz = z;
+  let pushed = false;
+
+  for (const blocker of blockers || []) {
+    const result = blocker.type === 'ellipse'
+      ? pushPointOutsideEllipse(px, pz, blocker, padding)
+      : pushPointOutsideCircle(px, pz, blocker, padding);
+    px = result.x;
+    pz = result.z;
+    pushed ||= result.pushed;
+  }
+
   return { x: px, z: pz, pushed };
 }
