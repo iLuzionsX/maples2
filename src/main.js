@@ -21,6 +21,7 @@ import { installWorldExpansion } from './game/WorldExpansion.js';
 import { installWorldExpansionAtmosphere } from './game/WorldExpansionAtmosphere.js';
 import { installWorldExpansionNature } from './game/WorldExpansionNature.js';
 import { installWorldTravelAuthority } from './game/WorldTravelAuthority.js';
+import { installLandmarkSilhouettePolish } from './game/LandmarkSilhouettePolish.js';
 import { installPerformancePass } from './game/PerformancePass.js';
 import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
@@ -45,6 +46,7 @@ installRowanRigCompatibility(game, rowanAnimationDirector);
 installFrameInvariantRowanTransitions(game, rowanAnimationDirector);
 installShowcaseQualityGate(game);
 installWorldExpansion(game);
+installLandmarkSilhouettePolish(game);
 installWorldExpansionAtmosphere(game);
 installWorldTravelAuthority(game);
 // Zero-quality-loss FPS pass remains opt-out only for deterministic A/B validation and final handoff validation.
