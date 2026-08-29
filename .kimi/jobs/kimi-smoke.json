@@ -1,0 +1,10 @@
+{
+  "id": "kimi-smoke-review",
+  "enabled": false,
+  "mode": "review",
+  "task": "Review the selected file for safe, production-quality improvements. Do not modify the repository.",
+  "files": ["src/game/Game.js"],
+  "model": "moonshotai/kimi-k3",
+  "reasoning_effort": "max",
+  "max_tokens": 12000
+}
