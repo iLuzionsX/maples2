@@ -1,5 +1,5 @@
 [build]
-  command = "npm run test:animation:unit && npm run build"
+  command = "npm run test:animation:unit && node scripts/netlify-validate.mjs"
   publish = "dist"
 
 [[headers]]
