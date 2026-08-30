@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "independent-code-review",
+  "enabled": false,
+  "mode": "review",
+  "objective": "Independently review the selected Maples code for correctness, maintainability, browser compatibility, mobile behavior, performance, and regressions.",
+  "role": "independent senior engineer and skeptical code reviewer",
+  "allowed_files": ["src/game/Game.js", "src/game/Character.js", "src/game/Input.js"],
+  "relevant_context": "Maples is a Three.js browser action-RPG. Preserve working systems and keep GPT-5.6 Sol as the lead integrator. Review only; do not create an applicable patch.",
+  "acceptance_criteria": ["Findings are concrete and tied to the supplied code", "Do not claim tests were run", "Call out uncertainty when a dependency is outside the allowlist"],
+  "commands": [],
+  "requested_output": "structured_review",
+  "reasoning_effort": "high",
+  "max_turns": 8,
+  "max_tokens": 24000
+}

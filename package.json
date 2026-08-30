@@ -11,9 +11,13 @@
     "test:movement:unit": "node tests/movement-unit.mjs",
     "test:movement": "npm run test:movement:unit && node tests/movement-e2e.mjs",
     "test:animation:unit": "node tests/rowan-animation-unit.mjs",
-    "test:mobile:unit": "node tests/mobile-camera-unit.mjs"
+    "test:mobile:unit": "node tests/mobile-camera-unit.mjs",
+    "kimi": "node scripts/kimi-agent.mjs",
+    "kimi:state": "node scripts/kimi-run-state.mjs",
+    "test:kimi": "node tests/kimi-agent-unit.mjs && node tests/kimi-control-plane-unit.mjs"
   },
   "dependencies": {
+    "@netlify/blobs": "10.7.13",
     "three": "^0.179.1"
   },
   "devDependencies": {

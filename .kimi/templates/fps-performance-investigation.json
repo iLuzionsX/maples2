@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "fps-performance-investigation",
+  "enabled": false,
+  "mode": "review",
+  "objective": "Investigate likely FPS and frame-time bottlenecks without reducing visual quality or changing gameplay values. Recommend measurable, low-risk improvements.",
+  "role": "senior Three.js rendering and performance engineer",
+  "allowed_files": ["src/game/PerformancePass.js", "src/game/PerformanceExtensions.js", "src/game/NatureInstancing.js", "src/game/FX.js", "src/game/World.js", "tests/performance-ab.mjs"],
+  "relevant_context": "Keep renderer quality, authored animation, VFX, camera, mobile controls, enemy presentation, and combat behavior intact. Desktop and mobile regressions matter. No patch is requested in this investigation.",
+  "acceptance_criteria": ["Separate measured evidence from hypotheses", "Identify the smallest useful benchmark or test", "Do not recommend pixel-ratio, asset, shadow, VFX, or gameplay downgrades without explicit evidence"],
+  "commands": ["npm run build", "npm run test:movement:unit"],
+  "requested_output": "structured_review",
+  "reasoning_effort": "max",
+  "max_turns": 10,
+  "max_tokens": 32000
+}

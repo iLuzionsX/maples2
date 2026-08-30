@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "id": "large-context-architecture-review",
+  "enabled": false,
+  "mode": "review",
+  "objective": "Review the architecture of the selected game systems as a whole. Identify split authority, lifecycle hazards, coupling, and the safest incremental path toward a production-quality implementation.",
+  "role": "staff-level game architect and systems reviewer",
+  "allowed_files": ["src/game/", "tests/"],
+  "relevant_context": "Maples is a Three.js browser action-RPG. Preserve the stylized fantasy direction, working systems, desktop and mobile validation, and existing Rowan animation compatibility. No direct changes are authorized by this review.",
+  "acceptance_criteria": ["Separate observed architecture from recommendations", "Prioritize risks and dependencies", "Give a phased plan that Sol can validate incrementally", "Call out files that should remain untouched"],
+  "commands": ["npm run build"],
+  "requested_output": "structured_review",
+  "reasoning_effort": "max",
+  "max_turns": 16,
+  "max_tokens": 64000
+}
