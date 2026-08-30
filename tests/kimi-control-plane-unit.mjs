@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { FileTelemetrySink, publicResultTelemetry, safeRunId, validateTelemetryUrl, telemetryTokenFromEnv, DEFAULT_TELEMETRY_URL } from '../scripts/kimi-agent/telemetry.mjs';
 import { parseArgs } from '../scripts/kimi-agent.mjs';
+import { applyEvent } from '../netlify/functions/kimi-event.mjs';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'maples-kimi-control-'));
 try {
@@ -42,6 +43,16 @@ try {
   assert.equal(publicResult.patch.bytes > 0, true);
   assert.deepEqual(publicResult.tests, [{ command: 'npm run build', ok: true, exit_code: null }]);
 
+  let lifecycle = applyEvent(null, { run_id: 'run-42', at: '2026-08-30T06:00:00Z', type: 'run_started', data: {}, metadata: {} });
+  lifecycle = applyEvent(lifecycle, { run_id: 'run-42', at: '2026-08-30T06:01:00Z', type: 'run_completed', data: { result: { status: 'completed' } }, metadata: {} });
+  assert.equal(lifecycle.agent_status, 'completed');
+  assert.equal(lifecycle.phase, 'sol_review');
+  lifecycle = applyEvent(lifecycle, { run_id: 'run-42', at: '2026-08-30T06:02:00Z', type: 'phase_changed', data: { phase: 'validation', status: 'running' }, metadata: {} });
+  assert.equal(lifecycle.agent_status, 'completed', 'Sol validation must not make Kimi look active again');
+  assert.equal(lifecycle.status, 'completed');
+  assert.equal(lifecycle.phase, 'validation');
+  assert.equal(lifecycle.phase_status, 'running');
+
   const args = parseArgs(['--job', '.kimi/jobs/x.json', '--run-id', 'run-42', '--session', 'mission-42', '--feature-pr', '41', '--feature-branch', 'feature/x', '--preview-url', 'https://example.netlify.app']);
   assert.equal(args.runId, 'run-42');
   assert.equal(args.session, 'mission-42');
@@ -53,6 +64,7 @@ try {
   assert.doesNotThrow(() => new Function(script), 'dashboard JavaScript must parse');
   assert.ok(html.includes('maples-agent-top'));
   assert.ok(html.includes('MONITOR ERROR'));
+  assert.ok(html.includes('PHASE STATUS'));
 
   const ingest = fs.readFileSync(new URL('../netlify/functions/kimi-event.mjs', import.meta.url), 'utf8');
   assert.ok(ingest.includes('KIMI_TELEMETRY_TOKEN'));
@@ -60,6 +72,10 @@ try {
   assert.ok(ingest.includes('timingSafeEqual'));
   assert.ok(ingest.includes('raw_output'));
   assert.ok(ingest.includes('patch_body'));
+
+  const compat = fs.readFileSync(new URL('../scripts/kimi-compat.mjs', import.meta.url), 'utf8');
+  assert.ok(compat.includes('DEPLOY_PRIME_URL'));
+  assert.ok(compat.includes('/.netlify/functions/kimi-event'));
 
   console.log('Kimi control-plane unit tests: PASS');
 } finally {
