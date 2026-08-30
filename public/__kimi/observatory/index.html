@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Kimi Observatory · Maples</title>
+  <style>
+    :root{--bg:#06080b;--panel:#0b0f14;--panel2:#0f151d;--line:#202b37;--text:#edf5ff;--muted:#8794a5;--lime:#9cffb8;--cyan:#66d9ff;--violet:#b799ff;--amber:#ffd477;--red:#ff7d88;--shadow:0 22px 80px rgba(0,0,0,.42)}
+    *{box-sizing:border-box}html{background:var(--bg)}body{margin:0;background:radial-gradient(circle at 75% -10%,rgba(102,217,255,.07),transparent 28rem),radial-gradient(circle at 12% 15%,rgba(183,153,255,.055),transparent 23rem),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}.shell{width:min(1480px,100%);margin:auto;padding:24px}.topbar{display:flex;gap:18px;justify-content:space-between;align-items:flex-start;margin-bottom:22px}.eyebrow{font:600 11px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.19em;text-transform:uppercase;color:var(--cyan)}h1{font-size:clamp(28px,4vw,58px);line-height:.94;letter-spacing:-.055em;margin:8px 0 10px;max-width:860px}.lead{color:var(--muted);max-width:760px;font-size:14px;line-height:1.55}.top-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.pill,.btn{border:1px solid var(--line);background:rgba(11,15,20,.78);color:var(--text);border-radius:999px;padding:9px 12px;font:600 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.05em}.btn{cursor:pointer}.btn:hover{border-color:#3a4a5d}.status-pill{display:flex;gap:8px;align-items:center}.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);box-shadow:0 0 16px currentColor}.dot.active{background:var(--cyan);color:var(--cyan);animation:pulse 1.5s infinite}.dot.success{background:var(--lime);color:var(--lime)}.dot.error{background:var(--red);color:var(--red)}@keyframes pulse{50%{opacity:.35;transform:scale(.7)}}
+    .grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(330px,.85fr);gap:14px}.card{background:linear-gradient(180deg,rgba(16,22,30,.93),rgba(8,12,17,.95));border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);overflow:hidden}.card-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:15px 17px;border-bottom:1px solid var(--line)}.card-title{font:700 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.14em;text-transform:uppercase}.card-body{padding:17px}.hero{display:grid;grid-template-columns:minmax(250px,.72fr) minmax(0,1.28fr);min-height:420px}.core-wrap{display:grid;place-items:center;position:relative;overflow:hidden;background:radial-gradient(circle at center,rgba(102,217,255,.06),transparent 52%)}.core{position:relative;width:min(72%,280px);aspect-ratio:1;border-radius:50%;display:grid;place-items:center}.core:before,.core:after{content:"";position:absolute;inset:0;border-radius:50%;border:1px solid rgba(102,217,255,.22)}.core:before{animation:spin 16s linear infinite;border-style:dashed}.core:after{inset:15%;border-color:rgba(183,153,255,.26);animation:spin 10s linear infinite reverse}.orb{width:54%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle at 38% 32%,rgba(255,255,255,.9) 0 2%,rgba(102,217,255,.78) 7%,rgba(69,126,255,.18) 36%,rgba(183,153,255,.08) 58%,transparent 72%);box-shadow:0 0 45px rgba(102,217,255,.2),inset 0 0 36px rgba(102,217,255,.17);transition:.3s}.working .orb{animation:breathe 1.9s ease-in-out infinite}.success-state .orb{background:radial-gradient(circle at 38% 32%,rgba(255,255,255,.95) 0 2%,rgba(156,255,184,.82) 8%,rgba(61,201,122,.18) 38%,rgba(102,217,255,.06) 58%,transparent 72%);box-shadow:0 0 48px rgba(156,255,184,.21),inset 0 0 38px rgba(156,255,184,.14)}.error-state .orb{background:radial-gradient(circle at 38% 32%,rgba(255,255,255,.9) 0 2%,rgba(255,125,136,.85) 9%,rgba(220,63,87,.17) 40%,transparent 72%);box-shadow:0 0 48px rgba(255,125,136,.18)}@keyframes spin{to{transform:rotate(360deg)}}@keyframes breathe{50%{transform:scale(1.08);filter:brightness(1.25)}}.core-label{position:absolute;bottom:11%;text-align:center;font:700 10px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}.hero-info{border-left:1px solid var(--line);padding:26px;display:flex;flex-direction:column;justify-content:center}.state-big{font-size:clamp(34px,5vw,70px);letter-spacing:-.055em;line-height:.95;margin:0 0 10px}.state-detail{font-size:14px;color:var(--muted);line-height:1.55;max-width:670px}.metric-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:28px}.metric{border-top:1px solid var(--line);padding-top:12px;min-width:0}.metric strong{display:block;font-size:18px;letter-spacing:-.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric span{display:block;color:var(--muted);font:600 9px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;text-transform:uppercase;letter-spacing:.11em;margin-top:4px}
+    .signal{height:82px;display:flex;align-items:flex-end;gap:3px;padding-top:16px}.bar{flex:1;min-width:2px;background:linear-gradient(180deg,var(--cyan),rgba(102,217,255,.08));border-radius:4px 4px 0 0;height:20%;opacity:.48;transition:height .4s ease}.working .bar{animation:signal 1.6s ease-in-out infinite;animation-delay:calc(var(--i) * -55ms)}@keyframes signal{0%,100%{height:18%;opacity:.32}50%{height:calc(28% + var(--h));opacity:.95}}.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.timeline{display:grid;gap:0}.event{display:grid;grid-template-columns:72px 14px minmax(0,1fr);gap:10px;min-height:60px}.turn{font:600 9px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);padding-top:3px}.rail{position:relative;display:flex;justify-content:center}.rail:after{content:"";position:absolute;width:1px;background:var(--line);top:14px;bottom:-6px}.event:last-child .rail:after{display:none}.node{width:8px;height:8px;border-radius:50%;background:var(--cyan);margin-top:4px;box-shadow:0 0 12px rgba(102,217,255,.32);z-index:1}.event.validate .node{background:var(--lime)}.event.patch .node{background:var(--violet)}.event.error .node{background:var(--red)}.event-copy b{display:block;font-size:12px;margin-bottom:3px}.event-copy small{display:block;color:var(--muted);font-size:11px;line-height:1.4}.list{display:grid;gap:7px}.list-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 0;border-bottom:1px solid rgba(32,43,55,.7);font-size:12px}.list-row:last-child{border-bottom:0}.list-row code{font:600 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;color:#c7d3e0;word-break:break-all}.tag{font:700 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;padding:5px 7px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap}.tag.pass{color:var(--lime);border-color:rgba(156,255,184,.26)}.tag.fail{color:var(--red);border-color:rgba(255,125,136,.28)}.tag.change{color:var(--violet);border-color:rgba(183,153,255,.3)}.empty{color:var(--muted);font-size:12px;line-height:1.5;padding:12px 0}.summary{font-size:16px;line-height:1.5;letter-spacing:-.012em}.privacy{margin-top:14px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;color:var(--muted);font-size:11px;line-height:1.5}.footer{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;color:var(--muted);font:600 9px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin:18px 2px 0}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.accent{color:var(--cyan)}
+    @media(max-width:940px){.grid,.section-grid{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.core-wrap{min-height:330px}.hero-info{border-left:0;border-top:1px solid var(--line)}.metric-row{grid-template-columns:1fr 1fr}.topbar{flex-direction:column}.top-actions{justify-content:flex-start}}@media(max-width:560px){.shell{padding:14px}.hero-info{padding:18px}.metric-row{grid-template-columns:1fr 1fr}.card-body{padding:14px}.event{grid-template-columns:55px 12px minmax(0,1fr)}h1{font-size:36px}.top-actions{gap:6px}.pill,.btn{padding:8px 9px}}
+    @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+  <main class="shell" id="app">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">Maples Engineering · Agent Telemetry</div>
+        <h1>Kimi Observatory</h1>
+        <div class="lead">A live supervision surface for Kimi K3 delegation. It shows real repository/run telemetry and validation state while deliberately excluding hidden reasoning, raw model output, secrets, and patch bodies.</div>
+      </div>
+      <div class="top-actions">
+        <div class="pill status-pill"><span class="dot" id="statusDot"></span><span id="statusPill">CONNECTING</span></div>
+        <div class="pill" id="prPill">PR —</div>
+        <button class="btn" id="refreshButton" type="button">REFRESH</button>
+      </div>
+    </header>
+
+    <div class="grid">
+      <section class="card hero" id="hero">
+        <div class="core-wrap">
+          <div class="core">
+            <div class="orb"></div>
+            <div class="core-label"><span id="coreTop">AGENT LINK</span><br><span class="accent" id="coreBottom">STANDBY</span></div>
+          </div>
+        </div>
+        <div class="hero-info">
+          <div class="eyebrow" id="phaseEyebrow">Telemetry handshake</div>
+          <div class="state-big" id="stateBig">Connecting.</div>
+          <div class="state-detail" id="stateDetail">Resolving the current pull request, latest commit, Netlify status, and sanitized Kimi telemetry.</div>
+          <div class="metric-row">
+            <div class="metric"><strong id="metricTurns">—</strong><span>Turns</span></div>
+            <div class="metric"><strong id="metricTokens">—</strong><span>Tokens</span></div>
+            <div class="metric"><strong id="metricFiles">—</strong><span>Files inspected</span></div>
+            <div class="metric"><strong id="metricPatch">—</strong><span>Patch files</span></div>
+          </div>
+          <div class="signal" id="signal" aria-label="Agent activity visualization"></div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="card-head"><div class="card-title">Mission parameters</div><div class="tag" id="effortTag">EFFORT —</div></div>
+        <div class="card-body">
+          <div class="summary" id="objective">Waiting for the active Kimi job configuration.</div>
+          <div class="list" style="margin-top:18px">
+            <div class="list-row"><span>Model</span><code id="modelValue">—</code></div>
+            <div class="list-row"><span>Commit</span><code id="commitValue">—</code></div>
+            <div class="list-row"><span>Netlify</span><span class="tag" id="netlifyTag">UNKNOWN</span></div>
+            <div class="list-row"><span>Max turns</span><code id="maxTurnsValue">—</code></div>
+            <div class="list-row"><span>Scope</span><code id="scopeValue">—</code></div>
+          </div>
+          <div class="privacy" id="privacyNote">The Observatory never renders raw assistant messages or chain-of-thought. Detailed telemetry appears after a deployment publishes its explicitly sanitized trace artifact.</div>
+        </div>
+      </aside>
+    </div>
+
+    <div class="section-grid">
+      <section class="card">
+        <div class="card-head"><div class="card-title">Agent activity</div><div class="tag" id="activityTag">LIVE STATE</div></div>
+        <div class="card-body"><div class="timeline" id="timeline"><div class="empty">No published run trace yet. While Netlify is building, this panel intentionally shows only externally verifiable run state.</div></div></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div class="card-title">Validation gates</div><div class="tag" id="testsTag">— TESTS</div></div>
+        <div class="card-body"><div class="list" id="testsList"><div class="empty">Validation results will appear after the sanitized trace publishes.</div></div></div>
+      </section>
+    </div>
+
+    <div class="section-grid">
+      <section class="card">
+        <div class="card-head"><div class="card-title">Repository focus</div><div class="tag" id="filesTag">— FILES</div></div>
+        <div class="card-body"><div class="list" id="filesList"><div class="empty">Waiting for repository telemetry.</div></div></div>
+      </section>
+      <section class="card">
+        <div class="card-head"><div class="card-title">Result / review pressure</div><div class="tag" id="riskTag">NO RESULT</div></div>
+        <div class="card-body">
+          <div class="summary" id="resultSummary">Kimi has not published a sanitized result for this deployment yet.</div>
+          <div class="list" id="riskList" style="margin-top:16px"></div>
+        </div>
+      </section>
+    </div>
+
+    <footer class="footer"><span id="pollInfo">polling GitHub every 5s</span><span id="generatedInfo">sanitized telemetry · no hidden reasoning</span></footer>
+  </main>
+
+  <script>
+    (()=>{
+      const $=id=>document.getElementById(id); const app=$('app');
+      const repo='iLuzionsX/maples2'; const host=location.hostname; const match=host.match(/deploy-preview-(\d+)--/); const pr=match?Number(match[1]):null;
+      let lastHead=null,lastState=null,reloadScheduled=false,jobConfig=null,trace=null,busy=false;
+      const signal=$('signal'); for(let i=0;i<44;i++){const b=document.createElement('i');b.className='bar';b.style.setProperty('--i',i);b.style.setProperty('--h',`${18+(i*17)%55}%`);signal.appendChild(b)}
+      const fmt=n=>{if(n==null||Number.isNaN(Number(n)))return '—';const v=Number(n);return v>=1e6?(v/1e6).toFixed(1)+'M':v>=1e3?(v/1e3).toFixed(1)+'k':String(v)};
+      const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      function setState(state,detail){app.classList.remove('working','success-state','error-state');const dot=$('statusDot');dot.className='dot';if(state==='pending'){app.classList.add('working');dot.classList.add('active');$('statusPill').textContent='RUNNING';$('phaseEyebrow').textContent='Delegation in progress';$('stateBig').textContent='Kimi is working.';$('coreTop').textContent='MISSION';$('coreBottom').textContent='ACTIVE'}else if(state==='success'){app.classList.add('success-state');dot.classList.add('success');$('statusPill').textContent='COMPLETE';$('phaseEyebrow').textContent='Deployment verified';$('stateBig').textContent='Run complete.';$('coreTop').textContent='MISSION';$('coreBottom').textContent='COMPLETE'}else if(state==='failure'||state==='error'){app.classList.add('error-state');dot.classList.add('error');$('statusPill').textContent='ATTENTION';$('phaseEyebrow').textContent='Run blocked';$('stateBig').textContent='Needs review.';$('coreTop').textContent='MISSION';$('coreBottom').textContent='BLOCKED'}else{$('statusPill').textContent='STANDBY';$('stateBig').textContent='Observatory online.';$('coreTop').textContent='AGENT LINK';$('coreBottom').textContent='STANDBY'}$('stateDetail').textContent=detail||'Waiting for the next telemetry update.'}
+      function renderConfig(){if(!jobConfig)return;$('objective').textContent=jobConfig.objective||'Active delegated Kimi job';$('modelValue').textContent=jobConfig.model||'moonshotai/kimi-k3';$('maxTurnsValue').textContent=jobConfig.max_turns??'—';$('scopeValue').textContent=(jobConfig.allowed_files||[]).length?`${jobConfig.allowed_files.length} allowlisted file${jobConfig.allowed_files.length===1?'':'s'}`:'—';$('effortTag').textContent=`EFFORT ${(jobConfig.reasoning_effort||'—').toUpperCase()}`}
+      function renderTrace(){const job=trace?.jobs?.[0];if(!job)return;$('metricTurns').textContent=job.turns??'—';const u=job.usage||{};$('metricTokens').textContent=fmt(u.total_tokens??u.totalTokens??((u.prompt_tokens||0)+(u.completion_tokens||0))||null);$('metricFiles').textContent=job.files_inspected?.length??0;$('metricPatch').textContent=job.patch?.changed_files?.length??0;$('modelValue').textContent=job.model||$('modelValue').textContent;$('effortTag').textContent=`EFFORT ${(job.reasoning_effort||jobConfig?.reasoning_effort||'—').toUpperCase()}`;$('resultSummary').textContent=job.summary||'Kimi completed without a public summary.';$('privacyNote').textContent=trace.privacy||$('privacyNote').textContent;$('generatedInfo').textContent=trace.generated_at?`trace ${new Date(trace.generated_at).toLocaleString()} · sanitized`:'sanitized telemetry';
+        const tests=job.tests||[];$('testsTag').textContent=`${tests.length} TEST${tests.length===1?'':'S'}`;$('testsList').innerHTML=tests.length?tests.map(t=>`<div class="list-row"><code>${esc(t.command)}</code><span class="tag ${t.ok===true?'pass':t.ok===false?'fail':''}">${t.ok===true?'PASS':t.ok===false?'FAIL':'RECORDED'}</span></div>`).join(''):'<div class="empty">No test result telemetry was published for this run.</div>';
+        const inspected=job.files_inspected||[],changed=job.files_proposed_for_change||[];$('filesTag').textContent=`${inspected.length} FILE${inspected.length===1?'':'S'}`;$('filesList').innerHTML=inspected.length?inspected.map(f=>`<div class="list-row"><code>${esc(f)}</code><span class="tag ${changed.includes(f)?'change':''}">${changed.includes(f)?'CHANGE':'READ'}</span></div>`).join(''):'<div class="empty">No inspected-file telemetry was published.</div>';
+        const risks=[...(job.risks||[]),...(job.unresolved_issues||[])];$('riskTag').textContent=risks.length?`${risks.length} FLAGS`:'CLEAN';$('riskList').innerHTML=risks.length?risks.map(r=>`<div class="list-row"><span>${esc(r)}</span><span class="tag">REVIEW</span></div>`).join(''):'<div class="empty">No public risks or unresolved issues were reported.</div>';
+        const synthetic=[];if(job.files_inspected?.length)synthetic.push({turn:'01',kind:'inspect',title:'Repository inspection complete',detail:`${job.files_inspected.length} scoped files inspected`});if(job.turns)synthetic.push({turn:String(job.turns).padStart(2,'0'),kind:'tool',title:'Reasoning loop completed',detail:`${job.turns} bounded agent turns`});for(const t of tests)synthetic.push({turn:'✓',kind:t.ok===false?'error':'validate',title:t.ok===false?'Validation issue':'Validation gate',detail:t.command});if(job.patch)synthetic.push({turn:'Δ',kind:'patch',title:'Patch proposal produced',detail:`${job.patch.changed_files?.length||0} files · ${fmt(job.patch.bytes)} bytes`});synthetic.push({turn:'END',kind:job.status==='completed'?'validate':'error',title:`Run ${job.status||'finished'}`,detail:job.error||'Sanitized result published'});$('timeline').innerHTML=synthetic.map(e=>`<div class="event ${e.kind}"><div class="turn">${esc(e.turn)}</div><div class="rail"><span class="node"></span></div><div class="event-copy"><b>${esc(e.title)}</b><small>${esc(e.detail)}</small></div></div>`).join('');$('activityTag').textContent='PUBLISHED TRACE'}
+      async function loadTrace(){try{const r=await fetch('/__kimi/observatory/trace.json?'+Date.now(),{cache:'no-store'});if(!r.ok)return;trace=await r.json();renderTrace()}catch{}}
+      async function loadJobConfig(sha){try{const dir=await fetch(`https://api.github.com/repos/${repo}/contents/.kimi/jobs?ref=${sha}`,{headers:{Accept:'application/vnd.github+json'}}).then(r=>r.ok?r.json():[]);for(const item of Array.isArray(dir)?dir:[]){if(!item.name?.endsWith('.json'))continue;const data=await fetch(item.download_url,{cache:'no-store'}).then(r=>r.ok?r.json():null);if(data?.enabled){jobConfig=data;renderConfig();return}}}catch{}}
+      async function poll(){if(busy)return;busy=true;try{if(!pr){$('prPill').textContent='LOCAL / BRANCH';setState(trace?.jobs?.[0]?.status==='completed'?'success':'idle','This host is not a deploy-preview URL, so live PR status polling is unavailable.');await loadTrace();return}$('prPill').textContent=`PR #${pr}`;const prData=await fetch(`https://api.github.com/repos/${repo}/pulls/${pr}`,{headers:{Accept:'application/vnd.github+json'},cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('PR lookup failed');return r.json()});const sha=prData.head?.sha;if(sha){$('commitValue').textContent=sha.slice(0,9);if(sha!==lastHead){lastHead=sha;loadJobConfig(sha)}}const statusData=sha?await fetch(`https://api.github.com/repos/${repo}/commits/${sha}/status`,{headers:{Accept:'application/vnd.github+json'},cache:'no-store'}).then(r=>r.ok?r.json():null):null;const netlify=(statusData?.statuses||[]).find(s=>String(s.context||'').startsWith('netlify/'))||null;const state=netlify?.state||statusData?.state||'unknown';lastState=state;$('netlifyTag').textContent=state.toUpperCase();$('netlifyTag').className='tag '+(state==='success'?'pass':state==='failure'||state==='error'?'fail':'');if(state==='pending'){setState('pending',`Netlify is processing commit ${sha?.slice(0,9)||'—'}. The detailed agent trace will publish only after this deploy is ready; until then this page shows externally verifiable run state.`)}else if(state==='success'){setState('success',`Netlify reports the latest PR head ${sha?.slice(0,9)||'—'} is published. Loading the sanitized Kimi result and validation telemetry.`);await loadTrace();const baked=trace?.build?.commit_ref;if(baked&&sha&&baked!==sha&&!reloadScheduled){reloadScheduled=true;setTimeout(()=>location.reload(),1800)}}else if(state==='failure'||state==='error'){setState('failure',`The latest Netlify run for ${sha?.slice(0,9)||'—'} did not publish successfully. Review the PR/Netlify build before trusting any generated patch.`);await loadTrace()}else{setState('idle','Waiting for a Netlify status on the latest PR head.');await loadTrace()}$('pollInfo').textContent=`PR #${pr} · latest head ${sha?.slice(0,9)||'—'} · next poll in 5s`}catch(err){setState('error',`Observatory could not refresh live PR telemetry: ${err.message}`);await loadTrace()}finally{busy=false}}
+      $('refreshButton').addEventListener('click',poll);loadTrace().then(poll);setInterval(poll,5000);
+    })();
+  </script>
+</body>
+</html>
