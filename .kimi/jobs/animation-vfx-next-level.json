@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "animation-vfx-next-level",
-  "enabled": true,
+  "enabled": false,
   "mode": "implementation",
   "objective": "Start over from first principles and make Maples' moment-to-moment character animation and combat VFX genuinely impressive. The previous direction was competent but too incremental. Do NOT treat the current animation/VFX implementation as the design target and do NOT merely add particles, glow, trails, or polish. First derive what premium action-RPG motion and impact should FEEL like to the player, then redesign the presentation systems necessary to achieve that feeling while preserving gameplay authority. The visual delta must be unmistakable within the first 10 seconds of running, attacking, dodging, taking a hit, and casting. Aim for a coherent proprietary Maples combat motion language that could stand beside a strong commercial indie action game, not a tech demo with more effects.",
   "role": "principal gameplay animation director and real-time VFX lead with authority to rethink presentation architecture from first principles; expert in Three.js, character motion, combat readability, motion design, hit feel, timing, silhouette, secondary motion, procedural animation, particles, trails, and GPU-conscious browser rendering",
