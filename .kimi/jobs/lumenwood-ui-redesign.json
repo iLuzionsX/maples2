@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "id": "lumenwood-ui-redesign",
+  "enabled": true,
+  "mode": "implementation",
+  "objective": "Redesign the Maples game UI from first principles. Treat the current HUD visual language as rejected: do not merely polish or restyle the existing glass-card composition. Produce a cohesive new interface that feels native to the game world — an original stylized fantasy action-RPG set around Lumenwood and the Sunken Glade — while preserving all existing gameplay/UI DOM contracts and behavior. The result should be commercial-indie quality, restrained, readable, tactile, and distinctive on desktop and mobile.",
+  "role": "principal game UI art director and senior frontend engineer specializing in action-RPG HUDs, responsive game interfaces, and touch ergonomics",
+  "allowed_files": [
+    "index.html",
+    "src/main.js",
+    "src/style.css",
+    "src/premium-ui.css",
+    "src/ui-production-pass.css",
+    "src/narrow-hud-fix.css",
+    "tests/ui-production-unit.mjs",
+    "tests/ui-production-desktop-e2e.mjs",
+    "tests/ui-production-mobile-e2e.mjs"
+  ],
+  "relevant_context": "Maples is a Three.js browser action-RPG inspired by the feeling of MapleStory + D&D while remaining original. The environment is a dark enchanted forest / ruined glade with Lumenwood wardens, moss, old stone, timber, iron, magic, ember light, and ancient runes. Start the UI design over. Avoid generic SaaS glassmorphism, sci-fi HUD language, excessive gradients, floating rounded cards, visual noise, and ornamental fantasy clutter. Prefer a modernized diegetic field-kit language: dark forged iron/charcoal, weathered parchment/ivory typography, muted moss/lichen greens, restrained brass, ember only for urgency, subtle rune/notch/woodcut geometry, strong silhouettes, negative space, and hierarchy. The HUD should stay out of the player's view, read instantly in combat, and feel authored rather than templated. Preserve every existing element ID/data-action relied on by Game/Input/tests. Do not change gameplay logic, Three.js rendering, input semantics, combat values, assets, or dependencies. External webfonts already used are acceptable, but do not add packages or image assets. Mobile must respect safe areas and thumb zones; controls must remain large, separated, and usable while moving/camera-fighting. Keep boss, quest, combo, toast, damage numbers, intro, victory, health/mana/xp, skill cooldowns, joystick, and mobile actions functional. It is acceptable to simplify copy visibility and visual chrome responsively. Prefer replacing the current layered override approach with one coherent source of truth where practical.",
+  "acceptance_criteria": [
+    "The new UI is visibly a fresh design, not an incremental polish of the current glass HUD",
+    "The visual language clearly belongs to Lumenwood / enchanted-forest fantasy rather than generic app UI",
+    "Desktop combat view remains spacious with health/resources, objective, boss state, skills, combo, and feedback prioritized correctly",
+    "Mobile layout works at narrow phone widths and landscape safe areas without HUD overlap or controls colliding",
+    "Touch actions remain at least approximately 44px and usable concurrently with movement/camera input",
+    "Existing DOM IDs, data-action hooks, hidden/show states, cooldown overlays, and runtime update contracts remain intact",
+    "Intro and victory screens share the same new art direction without obscuring loading/ready behavior",
+    "Reduced-motion and legibility concerns are handled reasonably",
+    "No gameplay, rendering, asset, dependency, or network behavior is changed",
+    "Update UI tests only when necessary to preserve meaningful behavior/layout assertions rather than snapshotting implementation details"
+  ],
+  "commands": [
+    "node tests/ui-production-unit.mjs",
+    "npm run build"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 12,
+  "max_tokens": 48000,
+  "timeout_ms": 900000,
+  "max_changed_files": 9,
+  "max_patch_bytes": 262144,
+  "retries": 3,
+  "stream": true
+}
