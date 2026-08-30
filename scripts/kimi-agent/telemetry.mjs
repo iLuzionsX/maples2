@@ -4,12 +4,23 @@ import crypto from 'node:crypto';
 import { redactSecrets } from './security.mjs';
 
 const RUN_ID_RE = /^[a-z0-9][a-z0-9._-]{0,95}$/i;
+const PREVIEW_HOST_RE = /^deploy-preview-\d+--maplesttstst\.netlify\.app$/i;
 export const DEFAULT_TELEMETRY_URL = 'https://maplesttstst.netlify.app/.netlify/functions/kimi-event';
 
 export function safeRunId(value) {
   const runId = String(value || '').trim();
   if (!RUN_ID_RE.test(runId) || /^(?:latest|index)$/i.test(runId)) throw new Error('Invalid or reserved Kimi run id.');
   return runId;
+}
+
+export function validateTelemetryUrl(value) {
+  let url;
+  try { url = new URL(String(value || '')); } catch { throw new Error('Kimi telemetry URL is invalid.'); }
+  const allowedHost = url.hostname === 'maplesttstst.netlify.app' || PREVIEW_HOST_RE.test(url.hostname);
+  if (url.protocol !== 'https:' || !allowedHost || url.pathname !== '/.netlify/functions/kimi-event') throw new Error('Kimi telemetry URL must be the maplesttstst control-plane endpoint.');
+  url.search = '';
+  url.hash = '';
+  return url.toString();
 }
 
 export function telemetryTokenFromEnv(env = process.env) {
@@ -74,6 +85,10 @@ function eventEnvelope(runId, sequence, type, data, metadata) {
   });
 }
 
+function assertRegularTarget(target) {
+  if (fs.existsSync(target) && fs.lstatSync(target).isSymbolicLink()) throw new Error('Kimi telemetry paths cannot be symlinks.');
+}
+
 export class FileTelemetrySink {
   constructor({ rootDir, runId, metadata = {} }) {
     this.rootDir = rootDir;
@@ -86,21 +101,26 @@ export class FileTelemetrySink {
     this.sequence += 1;
     const event = eventEnvelope(this.runId, this.sequence, type, data, this.metadata);
     const directory = path.join(this.rootDir, '.kimi', 'telemetry');
+    assertRegularTarget(path.join(this.rootDir, '.kimi'));
+    assertRegularTarget(directory);
     fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-    fs.appendFileSync(path.join(directory, `${this.runId}.jsonl`), `${JSON.stringify(event)}\n`, { mode: 0o600 });
-    fs.writeFileSync(path.join(directory, `${this.runId}.state.json`), `${JSON.stringify({ run_id: this.runId, latest: event }, null, 2)}\n`, { mode: 0o600 });
+    const logFile = path.join(directory, `${this.runId}.jsonl`);
+    const stateFile = path.join(directory, `${this.runId}.state.json`);
+    assertRegularTarget(logFile);
+    assertRegularTarget(stateFile);
+    fs.appendFileSync(logFile, `${JSON.stringify(event)}\n`, { mode: 0o600 });
+    fs.writeFileSync(stateFile, `${JSON.stringify({ run_id: this.runId, latest: event }, null, 2)}\n`, { mode: 0o600 });
     return event;
   }
 }
 
 export class HttpTelemetrySink {
   constructor({ url, token, runId, metadata = {} }) {
-    this.url = String(url || '').trim();
+    this.url = validateTelemetryUrl(url);
     this.token = String(token || '').trim();
     this.runId = safeRunId(runId);
     this.metadata = redactSecrets(metadata);
     this.sequence = 0;
-    if (!/^https:\/\//i.test(this.url)) throw new Error('Kimi telemetry URL must use HTTPS.');
   }
 
   async emit(type, data = {}) {
