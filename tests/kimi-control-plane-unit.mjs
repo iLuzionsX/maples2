@@ -3,13 +3,21 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { FileTelemetrySink, publicResultTelemetry, safeRunId } from '../scripts/kimi-agent/telemetry.mjs';
+import { FileTelemetrySink, publicResultTelemetry, safeRunId, validateTelemetryUrl, telemetryTokenFromEnv, DEFAULT_TELEMETRY_URL } from '../scripts/kimi-agent/telemetry.mjs';
 import { parseArgs } from '../scripts/kimi-agent.mjs';
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'maples-kimi-control-'));
 try {
   assert.equal(safeRunId('maples-animation-0042'), 'maples-animation-0042');
   assert.throws(() => safeRunId('latest'));
+  assert.equal(validateTelemetryUrl(DEFAULT_TELEMETRY_URL), DEFAULT_TELEMETRY_URL);
+  assert.equal(validateTelemetryUrl('https://deploy-preview-31--maplesttstst.netlify.app/.netlify/functions/kimi-event'), 'https://deploy-preview-31--maplesttstst.netlify.app/.netlify/functions/kimi-event');
+  assert.throws(() => validateTelemetryUrl('https://example.com/.netlify/functions/kimi-event'));
+  assert.throws(() => validateTelemetryUrl('https://maplesttstst.netlify.app/other'));
+  const derived = telemetryTokenFromEnv({ NVIDIA_API_KEY: 'nvapi-test-secret-value-1234567890' });
+  assert.equal(derived.length, 64);
+  assert.equal(derived.includes('nvapi-test-secret'), false);
+  assert.equal(telemetryTokenFromEnv({ KIMI_TELEMETRY_TOKEN: 'explicit', NVIDIA_API_KEY: 'ignored' }), 'explicit');
 
   const sink = new FileTelemetrySink({ rootDir: root, runId: 'maples-animation-0042', metadata: { feature_pr: 41, supervisor: 'GPT-5.6 Sol' } });
   await sink.emit('run_started', { objective: 'Make combat materially better.', max_tokens: 96000 });
@@ -48,6 +56,8 @@ try {
 
   const ingest = fs.readFileSync(new URL('../netlify/functions/kimi-event.mjs', import.meta.url), 'utf8');
   assert.ok(ingest.includes('KIMI_TELEMETRY_TOKEN'));
+  assert.ok(ingest.includes('NVIDIA_API_KEY'));
+  assert.ok(ingest.includes('timingSafeEqual'));
   assert.ok(ingest.includes('raw_output'));
   assert.ok(ingest.includes('patch_body'));
 
