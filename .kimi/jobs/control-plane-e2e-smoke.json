@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "control-plane-e2e-smoke",
-  "enabled": true,
+  "enabled": false,
   "mode": "review",
   "objective": "Perform a narrow independent review of the new Maples Kimi control-plane architecture. Verify from the allowlisted files that Agent Run identity is separated from Feature PR and Deploy Preview identity, that public telemetry is intentionally sanitized, and that monitoring errors are not treated as Kimi run failures. Return concise findings only. This is an infrastructure E2E smoke test, not a gameplay task.",
   "role": "senior agent-platform reliability engineer",
