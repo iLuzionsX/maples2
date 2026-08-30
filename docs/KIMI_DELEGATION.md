@@ -1,17 +1,122 @@
-# Kimi K3 delegation
+# Kimi K3 delegation and Maples Agent Control Plane
 
-GPT-5.6 Sol remains the lead engineer. Kimi K3 is a subordinate specialist reached through the direct CLI or the existing Netlify Deploy Preview compatibility path:
+GPT-5.6 Sol is the lead engineer. Kimi K3 is a bounded subordinate specialist. Kimi may inspect scoped repository state, run explicitly approved commands, and return a validated patch proposal; it never applies, commits, pushes, merges, or owns a feature branch.
+
+## First-principles model
+
+Three things are deliberately separate:
+
+1. **Agent Run** — the engineering mission and its telemetry/history.
+2. **Feature PR** — the candidate game/code changes Sol has reviewed and chosen to integrate.
+3. **Game Deploy Preview** — the Netlify build the owner actually play-tests.
+
+A Run ID survives Kimi follow-ups, Sol review, validation, preview creation, and owner feedback. A PR number or Netlify deploy ID is metadata attached to a run, never the run identity itself.
 
 ```text
-Sol → kimi-agent controller → scoped repository tools → NVIDIA NIM / moonshotai/kimi-k3
-Sol → Netlify compatibility entrypoint → same controller/schema → NVIDIA NIM / moonshotai/kimi-k3
+Owner prompt
+   ↓
+GPT-5.6 Sol — inspect / scope / branch / acceptance criteria
+   ↓
+Kimi controller — bounded repository tools + NVIDIA NIM
+   ├── sanitized live events → Maples Agent Control Plane
+   └── structured patch proposal → Sol review
+                                   ↓
+                            accepted changes only
+                                   ↓
+                           clean Feature PR
+                                   ↓
+                       tests + Netlify game preview
+                                   ↓
+                              owner play-test
 ```
 
-The controller is patch-first. Kimi can inspect and explain, and implementation jobs can return a validated unified diff. The controller never applies, commits, merges, or pushes a Kimi patch.
+## Permanent Observatory
+
+After the infrastructure is merged, the stable dashboard is:
+
+```text
+https://maplesttstst.netlify.app/__kimi/
+```
+
+It shows the latest run by default. Historical/specific runs use:
+
+```text
+https://maplesttstst.netlify.app/__kimi/?run=RUN_ID
+```
+
+The UI is intentionally btop-like and reports public engineering telemetry: phase/status, model, token and turn usage, tool names, files inspected/proposed, patch byte/file metadata, validation results, risks, feature PR/branch, game preview, Sol review phase, and owner feedback.
+
+It never publishes private chain-of-thought, raw assistant/model messages, repository file contents, patch bodies, secrets, or command stdout/stderr.
+
+## Direct CLI — preferred execution path
+
+Set the NVIDIA key in the process environment only:
+
+```bash
+export NVIDIA_API_KEY='...'
+```
+
+Start a new mission/run:
+
+```bash
+npm run kimi -- \
+  --job .kimi/templates/ab-implementation-proposal.json \
+  --implementation \
+  --session combat-motion \
+  --run-id maples-combat-motion-0042 \
+  --feature-branch feature/combat-motion-v3
+```
+
+Continue the same Kimi conversation **and the same control-plane run**:
+
+```bash
+npm run kimi -- \
+  --job .kimi/templates/ab-implementation-proposal.json \
+  --implementation \
+  --session combat-motion \
+  --run-id maples-combat-motion-0042 \
+  --follow-up "Preserve the dodge improvement; redesign melee contact and aftermath from first principles."
+```
+
+If `--run-id` is omitted, the controller creates a unique timestamped Run ID. Use an explicit Run ID when several Kimi/Sol/owner iterations should remain one mission.
+
+The controller automatically targets the permanent Maples telemetry endpoint. An explicit `KIMI_TELEMETRY_URL`/`--telemetry-url` is accepted only for the existing `maplesttstst` production site or one of its Deploy Previews. Telemetry authentication is derived one-way from the existing NVIDIA key unless `KIMI_TELEMETRY_TOKEN` is explicitly configured; the NVIDIA key itself is never transmitted to the control plane.
+
+## Sol lifecycle updates
+
+After Kimi returns, Sol owns the rest of the run lifecycle:
+
+```bash
+# Sol is reviewing the structured patch.
+npm run kimi:state -- --run maples-combat-motion-0042 --phase sol_review --message "Reviewing scope, architecture and visual-risk claims."
+
+# Accepted patch is being validated on the clean feature branch.
+npm run kimi:state -- --run maples-combat-motion-0042 --phase validation --status running
+
+# The actual game preview is ready for owner play-test.
+npm run kimi:state -- \
+  --run maples-combat-motion-0042 \
+  --feature-pr 41 \
+  --preview-url https://deploy-preview-41--maplesttstst.netlify.app
+
+# Owner requests another pass.
+npm run kimi:state -- --run maples-combat-motion-0042 --owner changes_requested --message "Dodge approved; melee still lacks weight."
+
+# Owner approves. This records approval; it does not merge anything.
+npm run kimi:state -- --run maples-combat-motion-0042 --owner approved
+```
+
+No lifecycle event can merge a PR. Merge remains an explicit owner-approved GitHub action performed by Sol.
+
+## Durable run store
+
+The permanent control plane uses Netlify Blobs (`maples-kimi-runs`) because site-wide Blobs persist across deploys. The write function requires authentication and performs a second server-side sanitization pass. The public read function exposes only the sanitized state needed by the Observatory.
+
+Run state is bounded to the latest 250 sanitized events. Telemetry is advisory/observability data; repository files, Git history, tests, and Netlify remain the authoritative engineering sources.
 
 ## Job schema
 
-Jobs use `.kimi/templates/*.json` as examples and can be copied to `.kimi/jobs/*.json` for a deliberate Netlify run. The shared fields are:
+Jobs use `.kimi/templates/*.json` as examples and can be copied to `.kimi/jobs/*.json` for deliberate compatibility-path runs. Core fields include:
 
 ```json
 {
@@ -37,49 +142,22 @@ Jobs use `.kimi/templates/*.json` as examples and can be copied to `.kimi/jobs/*
 }
 ```
 
-Legacy Netlify jobs using `task`, `files`, and `mode: "patch"` remain readable. They are normalized into the shared schema.
+## Controller boundaries
 
-## Modes
+- `review`: no patch tool; findings/recommendations only.
+- `implementation`: Kimi may call `propose_patch`; the controller validates scope, changed-file count, patch bytes, file operations, binary content, and clean application, then returns the patch to Sol without applying it.
+- `--dry-run`: validates the exact policy plan without calling NVIDIA.
 
-- `review`: only review findings and recommendations are returned. The patch tool is not exposed and `patch` must be `null`.
-- `implementation`: Kimi may call `propose_patch`. The unified diff is checked for allowed paths, file count, byte size, renames, new/deleted files, binary content, and clean application. It is returned for Sol to inspect; it is never applied automatically.
-- `--dry-run`: validates the job and prints the exact policy plan without calling NVIDIA.
+Controlled tools are `read_file`, `search_repository`, `list_tree`, `git_status`, `git_diff`, `run_approved_command`, and (implementation only) `propose_patch`. There is no unrestricted shell, arbitrary file-write tool, arbitrary network tool, commit, push, or merge capability.
 
-The controlled tools are `read_file`, `search_repository`, `list_tree`, `git_status`, `git_diff`, `run_approved_command`, and (implementation mode only) `propose_patch`. Shell access, arbitrary writes, commit/merge/push operations, and arbitrary network access are not exposed.
+## Netlify compatibility trigger
 
-## Direct CLI
+`.kimi/jobs/*.json` plus `scripts/kimi-delegate.mjs` remains a compatibility trigger for environments where Sol cannot invoke the direct CLI. It uses the same controller and now emits the same Run-ID telemetry. Enabled jobs remain feature-branch/PR-only and must be disabled or removed after results are retrieved.
 
-Set the key in the process environment only:
-
-```bash
-export NVIDIA_API_KEY='...'
-npm run kimi -- --job .kimi/templates/fps-performance-investigation.json --session fps-review
-```
-
-Useful variants:
-
-```bash
-# Validate scope and limits without an API request.
-npm run kimi -- --job .kimi/templates/fps-performance-investigation.json --dry-run
-
-# Force review-only even if a copied job was configured for implementation.
-npm run kimi -- --job .kimi/templates/independent-code-review.json --review-only --session review-1
-
-# Return a validated patch candidate; never apply it.
-npm run kimi -- --job .kimi/templates/ab-implementation-proposal.json --implementation --session ab-1 --output .kimi/out/ab-1.json
-
-# Continue the same Kimi conversation with all prior assistant/tool-call state.
-npm run kimi -- --job .kimi/templates/independent-code-review.json --session review-1 --follow-up "Recheck the highest-risk finding against the tests."
-```
-
-Sessions and debug logs are written under `.kimi/sessions/` and `.kimi/logs/`, are redacted, and are ignored by Git. The API key is never written to a prompt, session, result, or log.
-
-## Netlify compatibility
-
-The existing `maplesttstst` Deploy Preview bridge remains available through `scripts/kimi-delegate.mjs` and `scripts/kimi-verify-output.mjs`. It runs only when a job is enabled and the build is a Deploy Preview/branch deploy (or `KIMI_ALLOW_LOCAL=1` is deliberately set). Results are published as `/__kimi/<job-id>.json`, `/__kimi/index.json`, and `/__kimi/latest.json`.
-
-Enable a job only on a feature branch or draft PR. Run the full validation, inspect the structured result and patch independently, then disable/remove the job before ordinary pushes. Do not make gameplay or visual changes directly on `main`, and do not merge without explicit owner approval.
+The compatibility path is a trigger mechanism, not the control plane architecture. The long-term preferred flow is direct controller execution → durable telemetry → Sol-reviewed Feature PR → Netlify game preview.
 
 ## Security boundaries
 
-The controller resolves a real Git repository root, rejects path traversal and symlink escapes, blocks secret-file paths and secret-shaped content, caps input/output/turns/tokens/time, validates exact commands against a non-shell allowlist, uses a minimal command environment without API credentials, restricts the production endpoint to NVIDIA NIM over HTTPS, retries only transient HTTP failures, and handles cancellation. The controller logs metadata and redacted tool results, not credentials.
+The controller resolves a real Git repository root, blocks path traversal/symlink escapes and secret-file/content access, caps input/output/turns/tokens/time, validates exact commands against a non-shell allowlist, uses a minimal command environment without API credentials, restricts the production model endpoint to NVIDIA NIM over HTTPS, restricts telemetry to the `maplesttstst` control-plane endpoint, retries only transient model HTTP failures, and handles cancellation.
+
+Local sessions/logs/telemetry are redacted and ignored by Git. Remote telemetry is sanitized twice. Secrets remain environment variables only.
