@@ -3,3 +3,4 @@ node_modules/
 .kimi/logs/
 .kimi/sessions/
 .kimi/out/
+.kimi/telemetry/
