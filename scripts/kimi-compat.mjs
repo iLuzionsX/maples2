@@ -31,6 +31,7 @@ function writeJson(file, value) {
   fs.writeFileSync(file, `${JSON.stringify(redactSecrets(value), null, 2)}\n`);
 }
 
+// Stable control-plane target: /.netlify/functions/kimi-event on the production site.
 function compatibilityTelemetryUrl() {
   if (process.env.KIMI_TELEMETRY_URL) return process.env.KIMI_TELEMETRY_URL;
   return DEFAULT_TELEMETRY_URL;
