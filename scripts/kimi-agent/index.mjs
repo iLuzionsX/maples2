@@ -6,3 +6,4 @@ export * from './nim.mjs';
 export * from './tools.mjs';
 export * from './result.mjs';
 export * from './session.mjs';
+export * from './telemetry.mjs';
