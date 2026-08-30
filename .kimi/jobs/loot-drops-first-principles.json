@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "loot-drops-first-principles",
+  "enabled": true,
+  "mode": "implementation",
+  "objective": "Rebuild Maples' enemy loot-drop presentation from first principles. The current reward pickup is only three tiny glowing octahedrons and reads as cheap placeholder art. Replace it with a premium, artistic, original action-RPG loot language that makes enemy rewards feel desirable before pickup: authored drop burst and settle motion, distinct silhouettes, layered materials, rarity/value readability, tasteful emissive accents, grounding/contact shadows or halos, restrained particles/light, subtle idle motion, satisfying magnet/pickup choreography, and clean spatial composition. Start from zero aesthetically; treat the existing essence behavior only as a gameplay contract. Preserve the current reward value, XP/heal/mana behavior, enemy kill timing, progression, movement, combat, UI and mobile controls. Prefer a dedicated LootDrops module with shared resources/pooling rather than growing Game.js further. Use local Three.js procedural modeling for premium collectible forms unless an already-available img2threejs workflow or properly licensed local asset can be used safely. Do not add remote runtime asset dependencies. If importing any third-party asset is possible within the bounded environment, only use permissive/commercially compatible assets and document source/license in THIRD_PARTY_ASSETS.md; otherwise build polished original geometry/materials in code and explicitly note that external downloading is unavailable in the Kimi control plane.",
+  "role": "principal real-time loot/VFX artist-engineer and Three.js gameplay presentation engineer for a commercial-indie action RPG",
+  "allowed_files": [
+    "src/game/Game.js",
+    "src/game/LootDrops.js",
+    "src/game/FX.js",
+    "src/game/Audio.js",
+    "src/game/AssetVisuals.js",
+    "tests/loot-drops-unit.mjs",
+    "THIRD_PARTY_ASSETS.md",
+    "public/assets/loot/"
+  ],
+  "relevant_context": "Current main baseline is d665a9d2582df38f54697801189df06195e78691. Current Game._spawnEssence creates exactly 3 small OctahedronGeometry meshes using gold/teal emissive MeshStandardMaterial, and _updatePickups rotates/bobs them, magnetizes within 6 units after 0.35s, then grants the existing XP reward plus small HP/mana restore and pickup audio. Replace the visual/system implementation without silently changing those reward numbers or progression semantics. The owner wants expensive, interesting, artistic drops rather than generic gems/confetti. Design a cohesive Lumenwood loot language: e.g. carved relic shards, rune-bound motes, miniature material-rich tokens, botanical/forged motifs, asymmetry and authored silhouettes. Avoid franchise-copying, rainbow casino clutter, giant UI beams, excessive bloom, random particle spam, or primitive-only geometry with stronger emissive. High quality may use richer layered meshes/halos/lights; low/mobile quality must retain silhouette and rarity/value readability with reduced secondary effects. Pool/share geometry and materials; hard-cap transient FX and lights. Kimi's tool sandbox has no general web/download tool, so do not pretend to download assets. If an img2threejs or local asset workflow is not actually exposed, use original procedural Three.js modeling and leave the architecture ready for future imported models. Do not modify unrelated open PR work (including current VFX/map efforts).",
+  "acceptance_criteria": [
+    "Replace the existing octahedron essence placeholder with a clearly authored premium loot-drop system rather than merely increasing glow, size or particle count.",
+    "Drops have a deliberate lifecycle: enemy-death ejection/burst, physically plausible arc/settle, readable idle presentation, attraction/magnet phase, and satisfying pickup collapse/absorption.",
+    "Create at least 3 visually distinct reward forms or value/rarity treatments that remain coherent as one Maples/Lumenwood art system; deterministic reward value must still sum to the original enemy reward.",
+    "Use layered material separation such as metal/stone/resin/crystal/wood/rune accents or equivalent original treatment, with strong silhouettes readable at gameplay camera distance.",
+    "Use tasteful grounding and secondary feedback such as contact halo, rune decal/ring, sparkle wisps or tiny light only where it improves readability; avoid visual noise and excessive bloom.",
+    "Preserve exact existing pickup gameplay: reward value semantics, player XP progression, +1.8 HP and +2.5 mana per collected pickup, collection radius behavior within reasonable presentation-equivalent tolerances, and pickup audio contract unless an explicitly equivalent implementation is required.",
+    "Keep the main game loop clean by encapsulating loot presentation/update/disposal logic in a dedicated module unless there is a concrete reason not to.",
+    "Share/pool geometries and materials, cap dynamic lights/transients, avoid per-frame allocations where practical, and dispose resources correctly on collection/removal.",
+    "Define explicit high vs low/mobile visual budgets; low quality must retain core shape/value readability and pickup choreography rather than removing the effect.",
+    "Do not alter combat damage, cooldowns, enemy AI, movement, camera/input authority, UI contracts, boss flow or unrelated progression.",
+    "If any third-party asset is introduced, include its local file under public/assets/loot/ and document exact source/license/commercial-use compatibility in THIRD_PARTY_ASSETS.md. Never reference a remote asset at runtime.",
+    "Add focused tests in tests/loot-drops-unit.mjs for reward conservation, lifecycle/state transitions, resource sharing/budgets, cleanup/public contracts, or other deterministic invariants introduced by the implementation.",
+    "Run all pre-approved baseline build/regression commands and report measured results separately from assumptions. Because patches are proposal-only and never applied by Kimi, clearly state that new loot-specific tests require Sol's later review/application before they can be executed against the proposed implementation.",
+    "Return one bounded unified diff only inside the allowlist, plus concise risks, visual-validation guidance and performance notes for Sol review."
+  ],
+  "commands": [
+    "npm run build",
+    "npm run test:movement:unit",
+    "npm run test:animation:unit",
+    "npm run test:mobile:unit",
+    "node tests/enemy-facing-unit.mjs",
+    "node tests/ui-production-unit.mjs"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 16,
+  "max_tokens": 60000,
+  "timeout_ms": 900000,
+  "max_changed_files": 8,
+  "max_patch_bytes": 262144,
+  "retries": 3,
+  "stream": true
+}
