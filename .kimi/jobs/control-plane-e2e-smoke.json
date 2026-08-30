@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "control-plane-e2e-smoke",
+  "enabled": true,
+  "mode": "review",
+  "objective": "Perform a narrow independent review of the new Maples Kimi control-plane architecture. Verify from the allowlisted files that Agent Run identity is separated from Feature PR and Deploy Preview identity, that public telemetry is intentionally sanitized, and that monitoring errors are not treated as Kimi run failures. Return concise findings only. This is an infrastructure E2E smoke test, not a gameplay task.",
+  "role": "senior agent-platform reliability engineer",
+  "allowed_files": [
+    "scripts/kimi-agent/telemetry.mjs",
+    "netlify/functions/kimi-event.mjs",
+    "netlify/functions/kimi-run.mjs",
+    "public/__kimi/index.html",
+    "docs/KIMI_DELEGATION.md"
+  ],
+  "relevant_context": "This job deliberately exists for one Deploy Preview only to verify the durable sanitized telemetry path. Do not inspect gameplay files. Do not propose patches.",
+  "acceptance_criteria": [
+    "Confirm Run ID is conceptually independent from PR/deploy identity.",
+    "Confirm public telemetry excludes raw reasoning, raw model output, patch bodies, repository contents, and command stdout/stderr.",
+    "Confirm monitor connectivity errors are distinct from actual agent failure.",
+    "Report any concrete reliability concern supported by the allowlisted code."
+  ],
+  "commands": [],
+  "requested_output": "structured_review",
+  "reasoning_effort": "high",
+  "max_turns": 5,
+  "max_tokens": 10000,
+  "timeout_ms": 600000,
+  "max_changed_files": 5,
+  "max_patch_bytes": 65536,
+  "retries": 2,
+  "stream": true
+}
