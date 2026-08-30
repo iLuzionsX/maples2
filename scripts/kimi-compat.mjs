@@ -33,8 +33,7 @@ function writeJson(file, value) {
 
 function compatibilityTelemetryUrl() {
   if (process.env.KIMI_TELEMETRY_URL) return process.env.KIMI_TELEMETRY_URL;
-  const preview = cleanText(process.env.DEPLOY_PRIME_URL, 300).replace(/\/$/, '');
-  return preview ? `${preview}/.netlify/functions/kimi-event` : DEFAULT_TELEMETRY_URL;
+  return DEFAULT_TELEMETRY_URL;
 }
 
 export async function runNetlifyKimi({ rootDir = resolveRepoRoot(), outputDir = path.join(rootDir, KIMI_OUTPUT_DIR) } = {}) {
