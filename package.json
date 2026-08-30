@@ -12,6 +12,7 @@
     "test:movement": "npm run test:movement:unit && node tests/movement-e2e.mjs",
     "test:animation:unit": "node tests/rowan-animation-unit.mjs",
     "test:mobile:unit": "node tests/mobile-camera-unit.mjs",
+    "test:world": "node tests/world-expansion-unit.mjs",
     "kimi": "node scripts/kimi-agent.mjs",
     "kimi:state": "node scripts/kimi-run-state.mjs",
     "test:kimi": "node tests/kimi-agent-unit.mjs && node tests/kimi-control-plane-unit.mjs"

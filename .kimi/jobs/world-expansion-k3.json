@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "id": "world-expansion-k3",
+  "enabled": false,
+  "mode": "implementation",
+  "objective": "Design a production-quality high-effort Maples world expansion using the current compact glade as the protected combat core. Propose a scoped patch that adds authored traversable geography, stronger distant composition, richer material response, denser micro-detail, environmental storytelling, and GPU-conscious procedural set dressing. Translate lessons from modern open-world rendering analysis into techniques suitable for a Three.js browser game: layered depth, selective reflective/wet materials, soft atmospheric separation, landmark silhouettes, dense-but-instanced detail, and intentional lighting contrast. Do not imitate GTA assets, locations, branding, or art direction. Preserve existing enemy containment, combat values, camera/mobile controls, UI, animation, licensed assets, and the current performance passes. Favor reusable procedural asset builders and explicit metadata for future collision/LOD integration.",
+  "role": "principal Three.js world/environment engineer and technical art lead",
+  "allowed_files": [
+    "src/game/World.js",
+    "src/game/EnvironmentAssets.js",
+    "src/game/NatureAssets.js",
+    "src/game/ShowcasePass.js",
+    "src/game/PerformancePass.js",
+    "src/main.js",
+    "tests/visual-smoke.mjs",
+    "tests/movement-unit.mjs"
+  ],
+  "relevant_context": "The current World is a roughly 30-unit circular glade and Game currently clamps Rowan/enemies through world.clampToArena. A prior unmerged town expansion PR exists and must not be copied or silently integrated. The new work should preserve the combat glade as an encounter bubble while creating a credible path toward separate player travel bounds and authored outer regions. Sol will independently review every line and only integrate approved parts. img2threejs methodology will be used separately by Sol for new code-first procedural landmark assets, so make your patch modular and compatible with a later procedural asset module.",
+  "acceptance_criteria": [
+    "Return only a unified diff within the allowlist",
+    "Preserve the current combat encounter behavior and enemy containment",
+    "Do not reduce renderer quality, DPR, shadows, bloom, VFX, animation, or asset quality",
+    "Use deterministic or seeded placement where practical instead of Math.random for new large-scale authored composition",
+    "Create visually legible regions/landmarks rather than a uniformly enlarged empty field",
+    "Keep mobile/browser frame cost in mind and identify where instancing/LOD should be used",
+    "Do not claim runtime or visual validation unless an approved command actually ran",
+    "Explain risks and any follow-up tests in the structured result"
+  ],
+  "commands": [
+    "npm run build",
+    "npm run test:movement:unit",
+    "npm run test:mobile:unit"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 16,
+  "max_tokens": 64000,
+  "timeout_ms": 720000,
+  "max_changed_files": 8,
+  "max_patch_bytes": 262144,
+  "retries": 3,
+  "stream": true
+}
