@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "id": "animation-vfx-next-level",
+  "enabled": false,
+  "mode": "implementation",
+  "objective": "Start over from first principles and make Maples' moment-to-moment character animation and combat VFX genuinely impressive. The previous direction was competent but too incremental. Do NOT treat the current animation/VFX implementation as the design target and do NOT merely add particles, glow, trails, or polish. First derive what premium action-RPG motion and impact should FEEL like to the player, then redesign the presentation systems necessary to achieve that feeling while preserving gameplay authority. The visual delta must be unmistakable within the first 10 seconds of running, attacking, dodging, taking a hit, and casting. Aim for a coherent proprietary Maples combat motion language that could stand beside a strong commercial indie action game, not a tech demo with more effects.",
+  "role": "principal gameplay animation director and real-time VFX lead with authority to rethink presentation architecture from first principles; expert in Three.js, character motion, combat readability, motion design, hit feel, timing, silhouette, secondary motion, procedural animation, particles, trails, and GPU-conscious browser rendering",
+  "allowed_files": [
+    "src/game/RowanAnimationDirector.js",
+    "src/game/AnimationPolish.js",
+    "src/game/FX.js",
+    "src/game/Enhancements.js",
+    "src/game/AnimationVFXNextLevel.js",
+    "src/main.js",
+    "tests/rowan-animation-unit.mjs",
+    "tests/animation-vfx-unit.mjs"
+  ],
+  "relevant_context": "Maples is an original Three.js browser action-RPG targeting commercial-indie showcase quality on desktop and mobile. Character/Game action timing remains authoritative. Animation and VFX must consume real state/events and must never invent damage windows, hits, cooldowns, movement authority, or a competing action clock. Preserve imported GLB clip compatibility, public gameplay APIs, camera/input/UI behavior, combat values, enemy AI, asset licensing, mobile controls, and working performance systems. Existing code has locomotion blending, attack layering, foot IK, secondary cape/hair motion, weapon ribbons, dust, slash/ring/burst/dash/projectile/heal/level-up FX. These are ingredients, not sacred architecture. You may substantially rewrite or consolidate presentation code if that produces a clearly better system while preserving contracts. Do not use expensive postprocessing or external assets as a crutch. Low-quality/mobile mode must retain the same design language at a reduced budget.",
+  "acceptance_criteria": [
+    "Before coding, reason from first principles about six things: silhouette, weight, timing, trajectory, contact, and aftermath. Every major change must serve at least one of them.",
+    "Define a coherent Maples motion language: grounded fantasy, readable arcs, strong asymmetry, visible weight transfer, decisive contacts, controlled exaggeration, and restrained magical accents. It must not feel like generic Three.js particles pasted onto stock clips.",
+    "Running, acceleration, braking, turning, and return-to-idle must communicate mass through hips/chest counter-motion, lean, compression, foot timing, and secondary follow-through rather than only blend weights.",
+    "Melee attacks must be redesigned as complete motion phrases: anticipation, load, acceleration, contact, recoil/follow-through, recovery. The three-hit chain must have distinct silhouettes and rhythms, with the third hit clearly heavier and more dangerous without changing gameplay timing.",
+    "Contact must look authored. Real hits should produce directional response based on attack/target geometry: compact high-energy core, directional sparks/debris, low-frequency dust or shock shape, weapon follow-through/recoil, and a short readable aftermath. Misses must remain visually different from hits.",
+    "Dodges must communicate compression -> explosive displacement -> settle, with body tuck/lean and after-motion. Hurt reactions must visibly interrupt posture and recover weight without hijacking authoritative state.",
+    "Spells/projectiles/healing/level-up effects must each have a distinct visual grammar based on shape, motion, timing, and dissipation—not just different colors. Effects should communicate what happened before the player consciously reads it.",
+    "Weapon trails should describe the actual attack arc and speed. Prefer meaningful ribbon shape, width, taper, breakup, and persistence over brighter glow. Trail behavior should reveal timing and direction at a glance.",
+    "Use fewer, better particles. Prefer directional cones, streaks, motes, debris, dust sheets, soft sprites, ribbons, and layered temporal structure over primitive spam. Particle count must not be the main source of spectacle.",
+    "Secondary motion on cape/hair/upper body should reinforce acceleration, turns, attacks, and stops, giving motion a beginning and an end instead of perpetual procedural wobble.",
+    "Performance must improve or remain disciplined: shared geometry/materials, bounded pools, reusable buffers, no obvious hot-loop allocation churn, and explicit mobile/low-quality budgets.",
+    "The result must be visually unmistakable in a short play test. If the self-assessment is 'the same game but with nicer particles', reject the approach and redesign before returning the patch.",
+    "Do not change damage, hit windows, cooldowns, enemy AI, movement authority, camera behavior, input behavior, UI contracts, or licensed assets.",
+    "Preserve existing public contracts and add behavior-focused tests for any new pure timing/profile/budget logic.",
+    "Return only an allowlisted apply-clean unified diff. Avoid unrelated refactors.",
+    "Before final output, perform a hard self-critique from the perspective of a player seeing the game for the first time. Identify the three weakest-looking moments left, improve them, then return the patch. Do not stop at the first technically correct solution."
+  ],
+  "commands": [
+    "npm run test:animation:unit",
+    "npm run test:movement:unit",
+    "npm run test:mobile:unit",
+    "npm run build"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 28,
+  "max_tokens": 80000,
+  "timeout_ms": 900000,
+  "max_changed_files": 8,
+  "max_patch_bytes": 393216,
+  "retries": 3,
+  "stream": true
+}
