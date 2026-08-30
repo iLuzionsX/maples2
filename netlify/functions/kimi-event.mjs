@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { getStore } from '@netlify/blobs';
 
 const DENY_KEYS = /^(?:raw_output|content|stdout|stderr|reasoning|thinking|messages?|assistant_message|patch_body|secret|token)$/i;
@@ -5,6 +6,18 @@ const RUN_ID_RE = /^[a-z0-9][a-z0-9._-]{0,95}$/i;
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+}
+
+function expectedToken() {
+  if (process.env.KIMI_TELEMETRY_TOKEN) return String(process.env.KIMI_TELEMETRY_TOKEN);
+  if (!process.env.NVIDIA_API_KEY) return '';
+  return crypto.createHash('sha256').update(`maples-kimi-telemetry-v1:${process.env.NVIDIA_API_KEY}`).digest('hex');
+}
+
+function secureEqual(a, b) {
+  const left = Buffer.from(String(a || ''));
+  const right = Buffer.from(String(b || ''));
+  return left.length === right.length && crypto.timingSafeEqual(left, right);
 }
 
 function sanitize(value, depth = 0) {
@@ -66,10 +79,10 @@ function applyEvent(previous, event) {
 
 export default async function handler(request) {
   if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
-  const expected = String(process.env.KIMI_TELEMETRY_TOKEN || '');
+  const expected = expectedToken();
   if (!expected) return json({ error: 'telemetry_not_configured' }, 503);
   const supplied = String(request.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
-  if (!supplied || supplied !== expected) return json({ error: 'unauthorized' }, 401);
+  if (!secureEqual(supplied, expected)) return json({ error: 'unauthorized' }, 401);
   let raw;
   try { raw = await request.json(); } catch { return json({ error: 'invalid_json' }, 400); }
   if (!RUN_ID_RE.test(String(raw?.run_id || ''))) return json({ error: 'invalid_run_id' }, 400);
