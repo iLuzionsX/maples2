@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "owner-rejection-animation-vfx",
+  "enabled": true,
+  "mode": "implementation",
+  "objective": "OWNER FEEDBACK: \"I don't see a single difference.\" Treat this as a failed visual review, not a request for minor polish. The previous animation/VFX direction did not create an observable player-facing delta. Start again from first principles. Inspect the current Maples presentation as if you had never seen the previous solution. Define what must visibly change in the first 10 seconds of movement, melee, dodge, hit reaction, casting, projectile travel/impact, and recovery for a player to immediately notice a premium action-RPG feel. Then propose a substantially stronger, coherent animation/VFX patch. Do not optimize for code elegance before visible impact. Do not respond with more generic particles, brighter glow, or tiny procedural offsets. The result must change silhouettes, timing expression, trajectories, contact language, secondary motion, and aftermath enough that a side-by-side comparison is obvious without being told what changed. If your first approach would still plausibly produce the reaction \"I don't see a single difference,\" reject it yourself and redesign before returning the patch.",
+  "role": "principal gameplay animation director and real-time VFX lead performing a second-pass rescue after an explicit owner rejection; expert in first-principles motion design, combat feel, Three.js procedural animation, authored impact language, particles, trails, and performance-conscious browser rendering",
+  "allowed_files": [
+    "src/game/RowanAnimationDirector.js",
+    "src/game/AnimationPolish.js",
+    "src/game/FX.js",
+    "src/game/Enhancements.js",
+    "src/main.js",
+    "tests/rowan-animation-unit.mjs"
+  ],
+  "relevant_context": "Maples is an original Three.js browser action-RPG targeting commercial-indie showcase quality. The owner has just play-tested the current result and reported that they cannot see a single difference. That feedback overrides any prior assumption that the visual delta was sufficient. Gameplay authority remains sacred: do not alter damage, hit windows, cooldowns, movement authority, enemy AI, camera, input, UI contracts, or asset licensing. Animation/VFX consume authoritative state/events. You may substantially rethink presentation architecture within the allowlist. Mobile/low quality must retain the same design language at reduced cost. Fewer better effects are preferred to particle spam. Make changes that can be perceived at normal gameplay camera distance, not only in code or frame-by-frame inspection.",
+  "acceptance_criteria": [
+    "Begin from six first-principles dimensions: silhouette, weight, timing, trajectory, contact, and aftermath; explicitly use them to decide what must change.",
+    "The first 10 seconds of ordinary play must visibly differ at normal camera distance: acceleration, braking, turning, idle settle, attack windup/contact/recovery, and dodge must communicate more mass and intent.",
+    "Melee combo swings must have strongly different silhouettes and rhythms, with readable body commitment and a third hit that is unmistakably heavier without changing authoritative gameplay timing.",
+    "Real hits versus misses must be visually distinct through directional target-relative impact language and aftermath, not merely color/intensity changes.",
+    "Weapon trails must reveal actual arc, speed and direction with width/taper/persistence behavior that reads from gameplay distance.",
+    "Dodge must read as compression -> explosive displacement -> settle, and hurt reactions must visibly interrupt and recover posture without creating a competing state machine.",
+    "Spells/projectiles/healing must use distinct shape/motion/dissipation grammars rather than palette swaps.",
+    "Secondary cape/hair/torso motion must begin and end in response to acceleration, stops, turns and attacks instead of looking like ambient wobble.",
+    "Avoid solutions whose primary spectacle comes from more particles, bloom, or glow; prefer stronger motion composition and temporal structure.",
+    "Maintain bounded pools/shared resources and avoid obvious hot-loop allocation regressions; preserve coherent low-quality/mobile budgets.",
+    "Do not claim success because tests pass. Self-critique the proposed visual delta from a skeptical player's perspective and revise any element that could still look unchanged in a normal play test.",
+    "Return only an allowlisted apply-clean unified diff and behavior-focused tests where appropriate. No unrelated refactors."
+  ],
+  "commands": [
+    "npm run test:animation:unit",
+    "npm run test:movement:unit",
+    "npm run test:mobile:unit",
+    "npm run build"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 30,
+  "max_tokens": 90000,
+  "timeout_ms": 900000,
+  "max_changed_files": 6,
+  "max_patch_bytes": 393216,
+  "retries": 3,
+  "stream": true
+}
