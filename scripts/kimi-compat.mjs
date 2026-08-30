@@ -5,6 +5,7 @@ import { validateEnabledJobs, validateJob, cleanText } from './kimi-agent/schema
 import { NvidiaNimClient } from './kimi-agent/nim.mjs';
 import { resolveRepoRoot } from './kimi-agent/policy.mjs';
 import { runDelegatedSession } from './kimi-agent/session.mjs';
+import { createTelemetry, safeRunId, DEFAULT_TELEMETRY_URL, telemetryTokenFromEnv } from './kimi-agent/telemetry.mjs';
 import { redactSecrets, sanitizedError } from './kimi-agent/security.mjs';
 
 export const KIMI_JOB_DIR = '.kimi/jobs';
@@ -41,14 +42,30 @@ export async function runNetlifyKimi({ rootDir = resolveRepoRoot(), outputDir = 
   const results = [];
   for (const job of jobs) {
     const ref = cleanText(process.env.COMMIT_REF || process.env.HEAD || String(Date.now()), 32).replace(/[^a-z0-9._-]/gi, '-');
+    const runId = safeRunId(`${job.id}-${ref}`.slice(0, 96));
     const sessionId = `${job.id}-netlify-${ref}`.slice(0, 80);
-    console.log(`KIMI DELEGATION START: ${job.id}`);
-    const { result } = await runDelegatedSession({ job, rootDir, client, sessionId });
-    writeJson(path.join(outputDir, `${job.id}.json`), result);
-    results.push(result);
+    const telemetry = createTelemetry({
+      rootDir,
+      runId,
+      url: process.env.KIMI_TELEMETRY_URL || DEFAULT_TELEMETRY_URL,
+      token: telemetryTokenFromEnv(),
+      metadata: {
+        agent: 'Kimi K3',
+        supervisor: 'GPT-5.6 Sol',
+        repository: 'iLuzionsX/maples2',
+        feature_pr: process.env.REVIEW_ID ? Number(process.env.REVIEW_ID) : null,
+        feature_branch: process.env.BRANCH || null,
+        preview_url: process.env.DEPLOY_PRIME_URL || null,
+        transport: 'netlify-compat',
+      },
+    });
+    console.log(`KIMI DELEGATION START: ${job.id} (${runId})`);
+    const { result } = await runDelegatedSession({ job, rootDir, client, sessionId, telemetry });
+    writeJson(path.join(outputDir, `${job.id}.json`), { ...result, run_id: runId });
+    results.push({ ...result, run_id: runId });
     console.log(`KIMI DELEGATION PASS: ${job.id}`);
   }
-  writeJson(path.join(outputDir, 'index.json'), { schema_version: 1, jobs: results.map(result => ({ id: result.job_id, status: result.status, file: `${result.job_id}.json` })) });
+  writeJson(path.join(outputDir, 'index.json'), { schema_version: 1, jobs: results.map(result => ({ id: result.job_id, run_id: result.run_id, status: result.status, file: `${result.job_id}.json` })) });
   return { jobs: results, outputDir };
 }
 
