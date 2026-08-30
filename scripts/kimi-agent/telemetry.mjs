@@ -1,13 +1,21 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { redactSecrets } from './security.mjs';
 
 const RUN_ID_RE = /^[a-z0-9][a-z0-9._-]{0,95}$/i;
+export const DEFAULT_TELEMETRY_URL = 'https://maplesttstst.netlify.app/.netlify/functions/kimi-event';
 
 export function safeRunId(value) {
   const runId = String(value || '').trim();
   if (!RUN_ID_RE.test(runId) || /^(?:latest|index)$/i.test(runId)) throw new Error('Invalid or reserved Kimi run id.');
   return runId;
+}
+
+export function telemetryTokenFromEnv(env = process.env) {
+  if (env.KIMI_TELEMETRY_TOKEN) return String(env.KIMI_TELEMETRY_TOKEN);
+  if (!env.NVIDIA_API_KEY) return '';
+  return crypto.createHash('sha256').update(`maples-kimi-telemetry-v1:${env.NVIDIA_API_KEY}`).digest('hex');
 }
 
 function numeric(value) {
