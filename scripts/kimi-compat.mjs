@@ -31,6 +31,12 @@ function writeJson(file, value) {
   fs.writeFileSync(file, `${JSON.stringify(redactSecrets(value), null, 2)}\n`);
 }
 
+function compatibilityTelemetryUrl() {
+  if (process.env.KIMI_TELEMETRY_URL) return process.env.KIMI_TELEMETRY_URL;
+  const preview = cleanText(process.env.DEPLOY_PRIME_URL, 300).replace(/\/$/, '');
+  return preview ? `${preview}/.netlify/functions/kimi-event` : DEFAULT_TELEMETRY_URL;
+}
+
 export async function runNetlifyKimi({ rootDir = resolveRepoRoot(), outputDir = path.join(rootDir, KIMI_OUTPUT_DIR) } = {}) {
   const jobs = loadEnabledJobs(rootDir);
   if (!jobs.length) { console.log('KIMI DELEGATION SKIP: no enabled jobs'); return { jobs: [], outputDir }; }
@@ -47,7 +53,7 @@ export async function runNetlifyKimi({ rootDir = resolveRepoRoot(), outputDir = 
     const telemetry = createTelemetry({
       rootDir,
       runId,
-      url: process.env.KIMI_TELEMETRY_URL || DEFAULT_TELEMETRY_URL,
+      url: compatibilityTelemetryUrl(),
       token: telemetryTokenFromEnv(),
       metadata: {
         agent: 'Kimi K3',
