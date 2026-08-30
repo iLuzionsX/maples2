@@ -43,15 +43,48 @@ try {
   assert.equal(publicResult.patch.bytes > 0, true);
   assert.deepEqual(publicResult.tests, [{ command: 'npm run build', ok: true, exit_code: null }]);
 
-  let lifecycle = applyEvent(null, { run_id: 'run-42', at: '2026-08-30T06:00:00Z', type: 'run_started', data: {}, metadata: {} });
-  lifecycle = applyEvent(lifecycle, { run_id: 'run-42', at: '2026-08-30T06:01:00Z', type: 'run_completed', data: { result: { status: 'completed' } }, metadata: {} });
+  let lifecycle = applyEvent(null, {
+    run_id: 'run-42', at: '2026-08-30T06:00:00Z', type: 'run_started',
+    data: { feature_pr: 41, feature_branch: 'feature/first-pass' }, metadata: {},
+  });
+  lifecycle = applyEvent(lifecycle, {
+    run_id: 'run-42', at: '2026-08-30T06:01:00Z', type: 'run_completed',
+    data: { result: { status: 'completed', summary: 'Kimi result.' } }, metadata: {},
+  });
   assert.equal(lifecycle.agent_status, 'completed');
   assert.equal(lifecycle.phase, 'sol_review');
-  lifecycle = applyEvent(lifecycle, { run_id: 'run-42', at: '2026-08-30T06:02:00Z', type: 'phase_changed', data: { phase: 'validation', status: 'running' }, metadata: {} });
+  assert.equal(lifecycle.phase_status, 'waiting_for_owner');
+  assert.match(lifecycle.result.summary, /SOL REVIEW WAITING FOR OWNER/);
+  assert.match(lifecycle.result.summary, /say "review"/);
+  assert.equal(lifecycle.metadata.feature_pr, 41);
+  assert.equal(lifecycle.metadata.feature_branch, 'feature/first-pass');
+
+  lifecycle = applyEvent(lifecycle, {
+    run_id: 'run-42', at: '2026-08-30T06:01:30Z', type: 'phase_changed',
+    data: { phase: 'sol_review', status: 'running', feature_pr: 52, feature_branch: 'feature/follow-up' }, metadata: {},
+  });
+  assert.equal(lifecycle.agent_status, 'completed', 'Sol review must not make Kimi look active again');
+  assert.equal(lifecycle.feature_pr, 52);
+  assert.equal(lifecycle.feature_branch, 'feature/follow-up');
+  assert.equal(lifecycle.metadata.feature_pr, 52, 'dashboard must prefer the current PR context for the same Run ID');
+  assert.equal(lifecycle.metadata.feature_branch, 'feature/follow-up');
+
+  lifecycle = applyEvent(lifecycle, {
+    run_id: 'run-42', at: '2026-08-30T06:02:00Z', type: 'phase_changed',
+    data: { phase: 'validation', status: 'running' }, metadata: {},
+  });
   assert.equal(lifecycle.agent_status, 'completed', 'Sol validation must not make Kimi look active again');
   assert.equal(lifecycle.status, 'completed');
   assert.equal(lifecycle.phase, 'validation');
   assert.equal(lifecycle.phase_status, 'running');
+
+  lifecycle = applyEvent(lifecycle, {
+    run_id: 'run-42', at: '2026-08-30T06:03:00Z', type: 'preview_ready',
+    data: { url: 'https://deploy-preview-52--maplesttstst.netlify.app', feature_pr: 52, feature_branch: 'feature/follow-up' }, metadata: {},
+  });
+  assert.equal(lifecycle.phase, 'owner_playtest');
+  assert.equal(lifecycle.preview_url, 'https://deploy-preview-52--maplesttstst.netlify.app');
+  assert.equal(lifecycle.metadata.feature_pr, 52);
 
   const args = parseArgs(['--job', '.kimi/jobs/x.json', '--run-id', 'run-42', '--session', 'mission-42', '--feature-pr', '41', '--feature-branch', 'feature/x', '--preview-url', 'https://example.netlify.app']);
   assert.equal(args.runId, 'run-42');
@@ -72,6 +105,12 @@ try {
   assert.ok(ingest.includes('timingSafeEqual'));
   assert.ok(ingest.includes('raw_output'));
   assert.ok(ingest.includes('patch_body'));
+  assert.ok(ingest.includes('waiting_for_owner'));
+  assert.ok(ingest.includes('feature_branch'));
+
+  const stateCli = fs.readFileSync(new URL('../scripts/kimi-run-state.mjs', import.meta.url), 'utf8');
+  assert.ok(stateCli.includes('--feature-branch'));
+  assert.ok(stateCli.includes('feature_pr'));
 
   const compat = fs.readFileSync(new URL('../scripts/kimi-compat.mjs', import.meta.url), 'utf8');
   assert.ok(compat.includes('DEPLOY_PRIME_URL'));
