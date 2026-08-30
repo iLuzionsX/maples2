@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import process from 'node:process';
-import { createTelemetry, safeRunId } from './kimi-agent/telemetry.mjs';
+import { createTelemetry, safeRunId, DEFAULT_TELEMETRY_URL, telemetryTokenFromEnv } from './kimi-agent/telemetry.mjs';
 import { resolveRepoRoot } from './kimi-agent/policy.mjs';
 
 function parse(argv) {
@@ -28,8 +28,8 @@ async function main() {
   const telemetry = createTelemetry({
     rootDir,
     runId,
-    url: args.telemetryUrl || process.env.KIMI_TELEMETRY_URL || '',
-    token: process.env.KIMI_TELEMETRY_TOKEN || '',
+    url: args.telemetryUrl || process.env.KIMI_TELEMETRY_URL || DEFAULT_TELEMETRY_URL,
+    token: telemetryTokenFromEnv(),
     metadata: { supervisor: 'GPT-5.6 Sol', repository: 'iLuzionsX/maples2' },
   });
   if (args.previewUrl) {
