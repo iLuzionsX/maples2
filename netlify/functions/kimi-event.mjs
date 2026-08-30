@@ -36,7 +36,7 @@ function sanitize(value, depth = 0) {
   return String(value).slice(0, 1000);
 }
 
-function applyEvent(previous, event) {
+export function applyEvent(previous, event) {
   const state = previous && typeof previous === 'object' ? previous : { schema_version: 1, run_id: event.run_id, events: [] };
   const events = Array.isArray(state.events) ? state.events : [];
   const next = {
@@ -48,8 +48,10 @@ function applyEvent(previous, event) {
   };
   const data = event.data || {};
   if (event.type === 'run_started') {
+    next.agent_status = 'running';
     next.status = 'running';
     next.phase = 'kimi';
+    next.phase_status = 'running';
     next.started_at = event.at;
     next.metadata = { ...(next.metadata || {}), ...(event.metadata || {}), ...data };
   } else if (event.type === 'turn_completed') {
@@ -58,21 +60,26 @@ function applyEvent(previous, event) {
   } else if (event.type === 'tool_completed') {
     next.last_tool = data.tool || null;
   } else if (event.type === 'run_completed') {
-    next.status = data.result?.status || data.status || 'completed';
-    next.phase = next.status === 'completed' ? 'sol_review' : 'attention';
+    const agentStatus = data.result?.status || data.status || 'completed';
+    next.agent_status = agentStatus;
+    next.status = agentStatus;
+    next.phase = agentStatus === 'completed' ? 'sol_review' : 'attention';
+    next.phase_status = agentStatus === 'completed' ? 'waiting' : 'attention';
     next.result = data.result || null;
     next.completed_at = event.at;
   } else if (event.type === 'phase_changed') {
     next.phase = data.phase || next.phase;
-    if (data.status) next.status = data.status;
+    if (data.status) next.phase_status = data.status;
     if (data.message) next.phase_message = data.message;
   } else if (event.type === 'preview_ready') {
     next.phase = 'owner_playtest';
+    next.phase_status = 'ready';
     next.preview_url = data.url || next.preview_url;
     next.feature_pr = data.feature_pr ?? next.feature_pr;
   } else if (event.type === 'owner_feedback') {
     next.owner_feedback = { state: data.state || 'changes_requested', message: data.message || '', at: event.at };
     next.phase = data.state === 'approved' ? 'approved' : 'revision';
+    next.phase_status = data.state || 'changes_requested';
   }
   return next;
 }
