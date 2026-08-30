@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "id": "map-first-principles-20260830",
+  "enabled": true,
+  "mode": "implementation",
+  "objective": "Rebuild Maples' playable world/map art direction from first principles. The owner rejects the current map as toy-like, cheap, low-effort and visually generic. Treat the existing map implementation only as a gameplay-coordinate and integration reference, not as an art-direction reference. Replace the obvious circular diorama, evenly distributed props, exposed geometric primitives, repetitive low-poly cliff/rock language, flat material treatment and ring-of-trees composition with an expensive, authored, artistic fantasy environment that feels intentionally composed from every gameplay camera angle. The new world should have strong macro-landform hierarchy, asymmetry, a memorable silhouette, layered depth, believable terrain transitions, embedded ruins/architecture, deliberate negative space, path/landmark composition, differentiated materials, atmospheric depth and dense-but-controlled microdetail. Preserve the game's original Maples/Lumenwood identity without copying MapleStory, D&D art, or any other franchise.",
+  "role": "principal environment artist, level artist and Three.js rendering engineer for a commercial-indie action RPG",
+  "allowed_files": [
+    "src/game/World.js",
+    "src/game/ShowcasePass.js",
+    "src/game/EnvironmentAssets.js",
+    "src/game/NatureAssets.js",
+    "tests/world-art-direction-unit.mjs"
+  ],
+  "relevant_context": "Start from current main d665a9d and ignore old open world/map PRs as implementation sources. Current World.js visibly builds a cylinder/circle arena, icosahedron cloud clusters and tree crowns, uniformly scattered rocks/plants/crystals, procedural blocky ruins and a portal. ShowcasePass adds repeated dodecahedron cliff shelves, cylinders and cone mountains around the same circular composition. EnvironmentAssets and NatureAssets layer licensed KayKit/Quaternius assets over that base. The owner explicitly wants a true rethink, not more props or stronger bloom. Preserve gameplay contracts: Rowan/enemy movement and combat authority, encounter coordinates, boss trigger, portal functionality/unlock behavior, camera/input/UI, asset licensing, public manager readiness/failure contracts, performance rebatching/nature instancing compatibility and mobile playability. You may visually disguise or replace procedural primitives, redistribute decorative composition and create new procedural terrain/material/shader detail inside the allowlist, but do not change combat values, AI, control schemes, UI, progression or unrelated systems. Design for an authored high-fantasy basin/ruined sanctuary feeling with a dominant landmark, foreground/midground/background depth and terrain that flows continuously rather than reading as objects placed on a disc. Avoid low-poly toy silhouettes, evenly spaced radial layouts, obvious primitive geometry, random uniform scattering, excessive emissive clutter, or asset-pack showroom composition. Favor deterministic seeded layout, shared materials/geometries, instancing/batching-compatible structures, limited shadow casters, procedural textures/vertex variation where valuable, and quality-scaled density. Existing licensed assets may be retained, recontextualized, recolored/material-tuned or reduced if they strengthen the new composition.",
+  "acceptance_criteria": [
+    "The map no longer reads as a circular toy arena/diorama or a ring of evenly scattered props; its macro silhouette and terrain composition are authored, asymmetrical and visually intentional.",
+    "Eliminate or convincingly conceal the most obvious primitive-looking world geometry (cylinder ground, repeated cone mountains, dodecahedron cliff beads, icosahedron tree/cloud blobs) instead of merely increasing their count or subdivisions.",
+    "Create a clear environmental hierarchy with at least one memorable dominant landmark, supporting secondary landmarks, readable traversal space and layered foreground/midground/background depth.",
+    "Terrain, ruins, foliage, water/stream if retained, and portal/shrine elements feel embedded into one continuous place rather than separate asset-pack objects sitting on a flat surface.",
+    "Material response visibly differentiates stone, soil, moss/groundcover, wood/roots, foliage and magical elements using roughness/color/normal-or-procedural surface breakup appropriate to the existing renderer.",
+    "Foliage distribution uses ecological clustering, edge framing and deliberate openings rather than uniform radial scatter; high and low quality both preserve the composition.",
+    "Lighting/atmosphere supports depth and focal hierarchy without relying on excessive bloom/emissive intensity; mobile/low quality remains readable.",
+    "Preserve portal position/functionality and the gameplay coordinate contracts required by current encounter/movement systems unless a purely decorative transform leaves those mechanics unchanged.",
+    "Remain compatible with EnvironmentAssets, NatureAssets, PerformancePass rebatching and NatureInstancing; avoid unbounded allocations, per-frame geometry/material churn or large new runtime texture costs.",
+    "Use deterministic seeded procedural placement where randomness is required so tests and screenshots are reproducible.",
+    "Add focused unit coverage in tests/world-art-direction-unit.mjs for deterministic composition constants/contracts, quality budgets, preservation of gameplay-critical coordinates or other testable invariants introduced by the redesign.",
+    "Run the approved build and regression commands; report measured pass/fail results separately from visual assumptions and identify any remaining validation that requires Sol/owner play-testing.",
+    "Return a bounded unified diff only inside the allowlist, plus concise visual rationale, performance risks and validation notes for Sol review."
+  ],
+  "commands": [
+    "npm run build",
+    "npm run test:movement:unit",
+    "npm run test:animation:unit",
+    "npm run test:mobile:unit",
+    "node tests/enemy-facing-unit.mjs"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 18,
+  "max_tokens": 60000,
+  "timeout_ms": 720000,
+  "max_changed_files": 5,
+  "max_patch_bytes": 262144,
+  "retries": 3,
+  "stream": true
+}
