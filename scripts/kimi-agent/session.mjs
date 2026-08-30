@@ -7,6 +7,7 @@ import { RepoPolicy } from './policy.mjs';
 import { toolDefinitionsFor, dispatchTool, toolResultContent } from './tools.mjs';
 import { redactSecrets, safeJson, sanitizedError } from './security.mjs';
 import { KimiError } from './nim.mjs';
+import { publicResultTelemetry, publicUsage } from './telemetry.mjs';
 
 export function systemPrompt(job) {
   const context = Array.isArray(job.relevantContext) ? job.relevantContext.join('\n- ') : job.relevantContext;
@@ -83,6 +84,11 @@ function writeLog(rootDir, sessionId, event) {
   fs.appendFileSync(file, `${safeJson({ at: new Date().toISOString(), ...event }, 200_000)}\n`, { mode: 0o600 });
 }
 
+async function emitTelemetry(telemetry, type, data = {}) {
+  if (!telemetry?.emit) return;
+  try { await telemetry.emit(type, data); } catch {}
+}
+
 function dryRunPlan(job, rootDir) {
   return {
     schema_version: 1,
@@ -104,7 +110,7 @@ function dryRunPlan(job, rootDir) {
   };
 }
 
-export async function runDelegatedSession({ job, rootDir, client, sessionId = job.id, followUp = '', dryRun = false, onTextDelta, signal }) {
+export async function runDelegatedSession({ job, rootDir, client, sessionId = job.id, followUp = '', dryRun = false, onTextDelta, signal, telemetry = null }) {
   if (dryRun) return { result: dryRunPlan(job, rootDir), session: null };
   const safeId = safeSessionId(sessionId);
   let session = loadSession(rootDir, safeId);
@@ -129,15 +135,32 @@ export async function runDelegatedSession({ job, rootDir, client, sessionId = jo
   let usage = null;
   let status = 'completed';
   let error = null;
+  await emitTelemetry(telemetry, 'run_started', {
+    job_id: job.id,
+    session_id: safeId,
+    model: job.model,
+    mode: job.mode,
+    reasoning_effort: job.reasoningEffort,
+    max_turns: job.maxTurns,
+    max_tokens: job.maxTokens,
+    max_changed_files: job.maxChangedFiles,
+    max_patch_bytes: job.maxPatchBytes,
+    timeout_ms: job.timeoutMs,
+    allowed_files: job.allowedFiles,
+    objective: job.objective,
+    follow_up: Boolean(followUp),
+  });
   try {
     for (let turn = 0; turn < job.maxTurns; turn += 1) {
       if (signal?.aborted) throw new KimiError('CANCELLED', 'Kimi session cancelled.');
       session.turns += 1;
+      await emitTelemetry(telemetry, 'turn_started', { turn: session.turns });
       const response = await client.complete({ model: job.model, messages: session.messages, tools, maxTokens: job.maxTokens, reasoningEffort: job.reasoningEffort, temperature: job.mode === 'implementation' ? 0.2 : 0.35, stream: job.stream, timeoutMs: job.timeoutMs, retries: job.retries, signal, onChunk: chunk => {
         const delta = contentText(chunk?.choices?.[0]?.delta?.content);
         if (delta) onTextDelta?.(delta);
       }});
       usage = response.usage || usage;
+      await emitTelemetry(telemetry, 'turn_completed', { turn: session.turns, usage: publicUsage(usage) });
       const assistant = copyAssistantMessage(response.message);
       session.messages.push(assistant);
       assistantText = contentText(assistant.content);
@@ -147,11 +170,13 @@ export async function runDelegatedSession({ job, rootDir, client, sessionId = jo
       for (const call of calls) {
         const toolName = call?.function?.name || '';
         const args = call?.function?.arguments || '{}';
+        await emitTelemetry(telemetry, 'tool_started', { turn: session.turns, tool: toolName });
         const result = await dispatchTool(policy, toolName, args);
         const toolEvent = { name: toolName, call_id: call.id || '', result };
         session.tool_events.push(redactSecrets(toolEvent));
         session.messages.push({ role: 'tool', tool_call_id: call.id || `call-${session.turns}`, name: toolName, content: toolResultContent(result) });
         writeLog(rootDir, safeId, { event: 'tool', turn: session.turns, tool: toolName, result });
+        await emitTelemetry(telemetry, 'tool_completed', { turn: session.turns, tool: toolName, ok: result?.ok !== false });
       }
     }
     if (session.turns >= job.maxTurns && Array.isArray(session.messages.at(-1)?.tool_calls) && session.messages.at(-1).tool_calls.length) {
@@ -162,10 +187,12 @@ export async function runDelegatedSession({ job, rootDir, client, sessionId = jo
     status = caught?.code === 'CANCELLED' ? 'cancelled' : 'failed';
     error = sanitizedError(caught);
     writeLog(rootDir, safeId, { event: 'error', error });
+    await emitTelemetry(telemetry, 'run_error', { status, error });
   }
   const result = buildResult({ job, sessionId: safeId, assistantText, policy, toolEvents: session.tool_events, turns: session.turns, usage, status, error });
   session.last_result = result;
   session.proposed_patch = policy.proposed;
   saveSession(rootDir, session);
+  await emitTelemetry(telemetry, 'run_completed', { status: result.status, result: publicResultTelemetry(result) });
   return { result, session };
 }
