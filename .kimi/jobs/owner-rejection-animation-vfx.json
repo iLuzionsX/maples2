@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "id": "owner-rejection-animation-vfx",
-  "enabled": true,
+  "enabled": false,
   "mode": "implementation",
   "objective": "OWNER FEEDBACK: \"I don't see a single difference.\" Treat this as a failed visual review, not a request for minor polish. The previous animation/VFX direction did not create an observable player-facing delta. Start again from first principles. Inspect the current Maples presentation as if you had never seen the previous solution. Define what must visibly change in the first 10 seconds of movement, melee, dodge, hit reaction, casting, projectile travel/impact, and recovery for a player to immediately notice a premium action-RPG feel. Then propose a substantially stronger, coherent animation/VFX patch. Do not optimize for code elegance before visible impact. Do not respond with more generic particles, brighter glow, or tiny procedural offsets. The result must change silhouettes, timing expression, trajectories, contact language, secondary motion, and aftermath enough that a side-by-side comparison is obvious without being told what changed. If your first approach would still plausibly produce the reaction \"I don't see a single difference,\" reject it yourself and redesign before returning the patch.",
   "role": "principal gameplay animation director and real-time VFX lead performing a second-pass rescue after an explicit owner rejection; expert in first-principles motion design, combat feel, Three.js procedural animation, authored impact language, particles, trails, and performance-conscious browser rendering",
