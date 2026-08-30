@@ -6,11 +6,11 @@ import { validateJob } from './kimi-agent/schema.mjs';
 import { resolveRepoRoot } from './kimi-agent/policy.mjs';
 import { NvidiaNimClient } from './kimi-agent/nim.mjs';
 import { runDelegatedSession } from './kimi-agent/session.mjs';
-import { createTelemetry, safeRunId } from './kimi-agent/telemetry.mjs';
+import { createTelemetry, safeRunId, DEFAULT_TELEMETRY_URL, telemetryTokenFromEnv } from './kimi-agent/telemetry.mjs';
 import { redactSecrets, sanitizedError } from './kimi-agent/security.mjs';
 
 function usage() {
-  return `Usage: npm run kimi -- --job .kimi/jobs/example.json [options]\n\nOptions:\n  --session <id>         Persist/resume a multi-turn Kimi session\n  --run-id <id>          Stable control-plane Run ID across Kimi/Sol/play-test phases\n  --follow-up <text>     Add a follow-up user turn to an existing session\n  --feature-pr <number>  Attach the candidate gameplay PR to telemetry\n  --feature-branch <ref> Attach the candidate gameplay branch to telemetry\n  --preview-url <url>    Attach the current game Deploy Preview to telemetry\n  --telemetry-url <url>  HTTPS Kimi event ingestion endpoint (or KIMI_TELEMETRY_URL)\n  --dry-run              Validate and print the execution plan without calling NVIDIA\n  --review-only          Force review-only mode; no patch tool is exposed\n  --implementation       Force implementation mode; returns a validated patch, never applies it\n  --no-stream            Disable streamed responses\n  --output <path>        Write the structured result beneath the repository root\n  --root <path>          Run against a repository below this path\n  --json                 Print JSON only (default)\n`;
+  return `Usage: npm run kimi -- --job .kimi/jobs/example.json [options]\n\nOptions:\n  --session <id>         Persist/resume a multi-turn Kimi session\n  --run-id <id>          Stable control-plane Run ID across Kimi/Sol/play-test phases\n  --follow-up <text>     Add a follow-up user turn to an existing session\n  --feature-pr <number>  Attach the candidate gameplay PR to telemetry\n  --feature-branch <ref> Attach the candidate gameplay branch to telemetry\n  --preview-url <url>    Attach the current game Deploy Preview to telemetry\n  --telemetry-url <url>  Override the permanent Maples telemetry endpoint\n  --dry-run              Validate and print the execution plan without calling NVIDIA\n  --review-only          Force review-only mode; no patch tool is exposed\n  --implementation       Force implementation mode; returns a validated patch, never applies it\n  --no-stream            Disable streamed responses\n  --output <path>        Write the structured result beneath the repository root\n  --root <path>          Run against a repository below this path\n  --json                 Print JSON only (default)\n`;
 }
 
 function parseArgs(argv) {
@@ -78,8 +78,8 @@ async function main() {
   const telemetry = args.dryRun ? null : createTelemetry({
     rootDir,
     runId,
-    url: args.telemetryUrl || process.env.KIMI_TELEMETRY_URL || '',
-    token: process.env.KIMI_TELEMETRY_TOKEN || '',
+    url: args.telemetryUrl || process.env.KIMI_TELEMETRY_URL || DEFAULT_TELEMETRY_URL,
+    token: telemetryTokenFromEnv(),
     metadata: {
       agent: 'Kimi K3',
       supervisor: 'GPT-5.6 Sol',
