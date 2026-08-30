@@ -42,8 +42,9 @@ assert.equal(trace.jobs[0].tests[0].ok, true);
 assert.equal(serialized.includes('PRIVATE_MODEL_OUTPUT_SHOULD_NOT_PUBLISH'), false);
 assert.equal(serialized.includes('PRIVATE_PATCH_BODY_SHOULD_NOT_PUBLISH'), false);
 assert.equal(serialized.includes('PRIVATE_COMMAND_OUTPUT'), false);
-assert.equal(serialized.includes('raw_output'), false);
-assert.equal(serialized.includes('content'), false);
+assert.equal(Object.hasOwn(trace.jobs[0], 'raw_output'), false);
+assert.equal(Object.hasOwn(trace.jobs[0].patch, 'content'), false);
+assert.equal(Object.hasOwn(trace.jobs[0].tests[0], 'stdout'), false);
 
 fs.rmSync(root, { recursive: true, force: true });
 console.log('Kimi Observatory unit: PASS');
