@@ -36,7 +36,7 @@ function linkAbortSignal(external, timeoutMs) {
 function parseErrorBody(raw, status) {
   let data = {};
   try { data = JSON.parse(raw); } catch {}
-  const message = cleanText(data?.error?.message || data?.message || raw || `NVIDIA request failed (${status})`, 700) || `NVIDIA request failed (${status})`;
+  const message = cleanText(data?.error?.message || data?.message || data?.detail || raw || `NVIDIA request failed (${status})`, 700) || `NVIDIA request failed (${status})`;
   if (status === 401) return new KimiError('AUTH_FAILED', 'NVIDIA authentication failed. Check NVIDIA_API_KEY.', { status });
   if (status === 403) return new KimiError('FORBIDDEN', 'NVIDIA rejected access to this model or endpoint.', { status });
   if (status === 404) return new KimiError('MODEL_NOT_FOUND', `NVIDIA model or endpoint was not found: ${message}`, { status });
@@ -108,6 +108,50 @@ export async function readChatResponse(response, { onChunk } = {}) {
   return state;
 }
 
+function wait(ms, signal) {
+  if (!signal) return new Promise(resolve => setTimeout(resolve, ms));
+  if (signal.aborted) return Promise.reject(signal.reason || new KimiError('CANCELLED', 'Kimi session cancelled.'));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { signal.removeEventListener('abort', onAbort); resolve(); }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      reject(signal.reason || new KimiError('CANCELLED', 'Kimi session cancelled.'));
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+async function resolveQueuedResponse(response, { fetchImpl, baseUrl, apiKey, signal }) {
+  if (response.status !== 202) return response;
+  const raw = await response.text().catch(() => '');
+  let queued = {};
+  try { queued = JSON.parse(raw); } catch {}
+  const requestId = cleanText(queued?.requestId || queued?.request_id || queued?.id, 64);
+  if (!/^[a-z0-9-]{1,64}$/i.test(requestId)) throw new KimiError('QUEUE_PROTOCOL_ERROR', 'NVIDIA queued the request without a valid requestId.');
+
+  let delay = 500;
+  while (true) {
+    await wait(delay, signal);
+    const poll = await fetchImpl(`${baseUrl}/status/${encodeURIComponent(requestId)}`, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+      signal,
+    });
+    if (poll.status === 202) {
+      await poll.text().catch(() => '');
+      delay = Math.min(2_000, Math.round(delay * 1.5));
+      continue;
+    }
+    if (!poll.ok) {
+      const pollError = parseErrorBody(await poll.text().catch(() => ''), poll.status);
+      pollError.retryAfter = poll.headers.get('retry-after');
+      throw pollError;
+    }
+    return poll;
+  }
+}
+
 export class NvidiaNimClient {
   constructor({ apiKey = process.env.NVIDIA_API_KEY, baseUrl = process.env.NVIDIA_BASE_URL || DEFAULT_BASE_URL, fetchImpl = globalThis.fetch, testEndpoint = false } = {}) {
     if (!apiKey || /\s/.test(apiKey)) throw new KimiError('MISSING_API_KEY', 'NVIDIA_API_KEY is missing or invalid.');
@@ -135,7 +179,7 @@ export class NvidiaNimClient {
       if (signal?.aborted) throw new KimiError('CANCELLED', 'Kimi session cancelled.');
       const linked = linkAbortSignal(signal, timeoutMs);
       try {
-        const response = await this.fetch(`${this.baseUrl}/chat/completions`, {
+        let response = await this.fetch(`${this.baseUrl}/chat/completions`, {
           method: 'POST',
           headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json', Accept: stream ? 'text/event-stream' : 'application/json' },
           body: JSON.stringify(body),
@@ -146,6 +190,7 @@ export class NvidiaNimClient {
           requestError.retryAfter = response.headers.get('retry-after');
           throw requestError;
         }
+        response = await resolveQueuedResponse(response, { fetchImpl: this.fetch, baseUrl: this.baseUrl, apiKey: this.apiKey, signal: linked.signal });
         const result = await readChatResponse(response, { onChunk });
         if (!result.message || (!result.message.content && !result.message.tool_calls?.length)) throw new KimiError('EMPTY_RESPONSE', 'NVIDIA returned no assistant content or tool call.');
         return result;
