@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#0b1718" />
+    <meta name="theme-color" content="#07100f" />
     <meta name="description" content="Emberfall — a stylized Three.js action RPG vertical slice." />
     <title>Emberfall — Maples</title>
   </head>
@@ -11,21 +11,21 @@
     <div id="app">
       <canvas id="game"></canvas>
       <div id="hud">
-        <div class="topbar glass">
-          <div class="crest"><span>IV</span></div>
+        <div class="topbar" aria-label="Rowan status">
+          <div class="crest" aria-hidden="true"><span>W</span></div>
           <div class="identity">
-            <div class="eyebrow">WARDEN OF LUMENWOOD</div>
+            <div class="eyebrow">LUMENWOOD WARDEN</div>
             <div class="name-row"><strong>Rowan</strong><span id="level">Lv. 7</span></div>
             <div class="bars">
-              <div class="bar hp"><i id="hp-fill"></i><b id="hp-text">100 / 100</b></div>
-              <div class="bar mana"><i id="mana-fill"></i></div>
-              <div class="bar xp"><i id="xp-fill"></i></div>
+              <div class="bar hp" aria-label="Health"><i id="hp-fill"></i><b id="hp-text">100 / 100</b></div>
+              <div class="bar mana" aria-label="Mana"><i id="mana-fill"></i></div>
+              <div class="bar xp" aria-label="Experience"><i id="xp-fill"></i></div>
             </div>
           </div>
         </div>
 
-        <div class="quest glass">
-          <div class="quest-label">ACTIVE QUEST</div>
+        <div class="quest" aria-label="Current objective">
+          <div class="quest-label">OATH IN PROGRESS</div>
           <div class="quest-title">The Briarbound</div>
           <div class="quest-copy" id="quest-copy">Drive the corrupted creatures from the Sunken Glade.</div>
           <div class="quest-progress"><span id="quest-progress">0 / 8 defeated</span><i><b id="quest-fill"></b></i></div>
@@ -41,38 +41,38 @@
         <div id="toast" class="toast"></div>
         <div id="damage-layer"></div>
 
-        <div class="skills glass">
-          <div class="skill"><kbd>1</kbd><div class="skill-icon slash">✦</div><span>Slash</span><em id="cd-attack"></em></div>
-          <div class="skill"><kbd>Q</kbd><div class="skill-icon ember">◆</div><span>Lance</span><em id="cd-spell"></em></div>
-          <div class="skill"><kbd>SPACE</kbd><div class="skill-icon dodge">➤</div><span>Dash</span><em id="cd-dodge"></em></div>
+        <div class="skills" aria-label="Combat actions">
+          <div class="skill"><kbd>1</kbd><div class="skill-icon slash">✦</div><span>Steel</span><em id="cd-attack"></em></div>
+          <div class="skill"><kbd>Q</kbd><div class="skill-icon ember">◆</div><span>Ember</span><em id="cd-spell"></em></div>
+          <div class="skill"><kbd>SPACE</kbd><div class="skill-icon dodge">➤</div><span>Evade</span><em id="cd-dodge"></em></div>
         </div>
 
-        <div class="crosshair"><i></i></div>
+        <div class="crosshair" aria-hidden="true"><i></i></div>
         <div class="vignette"></div>
         <div id="damage-flash"></div>
 
         <div id="intro" class="intro">
-          <div class="intro-line"></div>
-          <div class="intro-kicker">LUMENWOOD · CHAPTER I</div>
+          <div class="intro-line" aria-hidden="true"></div>
+          <div class="intro-kicker">LUMENWOOD · FIRST OATH</div>
           <h1>EMBERFALL</h1>
           <p>The old forest remembers every oath.</p>
           <button id="enter-btn">Enter the Glade</button>
-          <small>WASD move · Mouse look · LMB attack · Q spell · Space dash</small>
+          <small>WASD move · Mouse look · LMB attack · Q ember · Space evade</small>
         </div>
 
         <div id="victory" class="victory hidden">
-          <div class="victory-kicker">GLADE RESTORED</div>
-          <h2>Thornmaw has fallen.</h2>
-          <p>The briars loosen their grip. For now.</p>
-          <button id="restart-btn">Play Again</button>
+          <div class="victory-kicker">OATH FULFILLED</div>
+          <h2>The glade breathes again.</h2>
+          <p>Thornmaw has fallen. The briars loosen their grip — for now.</p>
+          <button id="restart-btn">Return to the Glade</button>
         </div>
 
         <div id="mobile-controls" class="mobile-controls">
           <div id="joystick" class="joystick"><div id="joystick-knob"></div></div>
           <div class="mobile-actions">
-            <button data-action="spell" class="m-spell">◆</button>
-            <button data-action="dodge" class="m-dodge">➤</button>
-            <button data-action="attack" class="m-attack">✦</button>
+            <button data-action="spell" class="m-spell" aria-label="Ember spell">◆</button>
+            <button data-action="dodge" class="m-dodge" aria-label="Evade">➤</button>
+            <button data-action="attack" class="m-attack" aria-label="Attack">✦</button>
           </div>
         </div>
       </div>
