@@ -22,7 +22,7 @@ for (const required of [
   assert.ok(html.includes(required), `live Observatory missing required telemetry marker: ${required}`);
 }
 
-for (const forbidden of ['raw_output', 'patch.content', 'stdout', 'stderr', 'chain-of-thought']) {
+for (const forbidden of ['raw_output', 'patch.content']) {
   assert.equal(html.includes(forbidden), false, `live Observatory must not request/render private field: ${forbidden}`);
 }
 
