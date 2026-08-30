@@ -14,7 +14,7 @@
     "test:mobile:unit": "node tests/mobile-camera-unit.mjs",
     "kimi": "node scripts/kimi-agent.mjs",
     "kimi:state": "node scripts/kimi-run-state.mjs",
-    "test:kimi": "node tests/kimi-agent-unit.mjs && node tests/kimi-queued-response-unit.mjs && node tests/kimi-control-plane-unit.mjs"
+    "test:kimi": "node tests/kimi-agent-unit.mjs && node tests/kimi-queued-response-unit.mjs && node tests/kimi-stable-telemetry-unit.mjs && node tests/kimi-control-plane-unit.mjs"
   },
   "dependencies": {
     "@netlify/blobs": "10.7.13",
