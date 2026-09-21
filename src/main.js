@@ -19,6 +19,7 @@ import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
 import { installCameraPitchControls } from './game/CameraPitchControls.js';
+import { installBestiary } from './game/Bestiary.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -43,6 +44,7 @@ const performancePass = performanceDisabled ? null : installPerformancePass(game
 const performanceExtensions = performanceDisabled ? null : installPerformanceExtensions(game);
 installMobileCameraControls(game);
 installCameraPitchControls(game);
+installBestiary(game);
 const environmentPromise = installEnvironmentAssets(game);
 const naturePromise = installNatureAssets(game);
 

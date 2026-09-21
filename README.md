@@ -16,11 +16,11 @@
 The encounter combines authored gameplay with locally vendored GLTF art:
 
 - **Rowan:** an imported, rigged KayKit Knight with sword, shield, helmet and cape. His visible rig cross-fades native idle/walk/run, three one-handed attacks, dodge, spellcast, hit and death clips while Emberfall's own combat windows remain authoritative.
-- **Briarbound:** three imported Quaternius creature families — skeletons, ghosts and bats — with native movement/attack/hit/death animation mapped onto the existing telegraph, stagger and damage systems.
-- **Thornmaw:** a separate imported Quaternius demon boss with its own scale, presentation, health bar and shrine reveal.
+- **Briarbound:** three imported Quaternius creature families with different tactics. Skeletons brace against frontal hits until a heavy cut, a critical, or Ember Lance breaks the guard. Wisps hang back and throw hex bolts, blinking away if you close. Bats orbit and dive, then sit exposed through a long recovery.
+- **Thornmaw:** a separate imported Quaternius demon boss with its own scale, presentation, health bar and shrine reveal. Below two-thirds health the roots rupture in an expanding ring; below one-third Thornmaw charges and calls another briarbound.
 - **World:** the procedural Lumenwood foundation is layered with KayKit arches, stairs, pillars, ruined walls and torches plus a curated Quaternius Stylized Nature subset for textured pines, flowering bushes, ferns and grass.
 - **Combat feel:** three-hit melee chaining, soft target facing, attack lunges, dodge i-frames, mana projectile magic, criticals, hit-stop, knockback/stagger, camera impulse, damage numbers and layered sword/spell VFX.
-- **Progression:** essence pickups, health/mana recovery, XP, level-up feedback, death recovery and encounter escalation into the boss phase.
+- **Progression:** essence pickups, health/mana recovery, XP, and a level-up oath. Steel deepens melee, Ember cheapens and strengthens the lance, Warden shortens the evade cooldown and lengthens its invulnerable beat. Death recovery and encounter escalation lead into the boss.
 - **Presentation:** atmospheric sky/fog, dynamic lighting/shadows, bloom on the high tier, procedural WebAudio, a reactive portal, readable enemy windups, a boss-reveal camera and a polished fantasy HUD.
 - **Mobile:** adaptive rendering quality, virtual movement stick and touch action buttons.
 
@@ -51,6 +51,8 @@ npm run test:visual
 ```
 
 `npm run test:movement` covers keyboard/touch movement direction, camera-relative movement, imported hero facing, vertical camera-look direction, desktop/mobile HUD layout bounds, and mobile controls.
+
+`npm run test:bestiary` checks creature roles, skeleton guard, Thornmaw phase thresholds, and oath math. With the preview server running, `npm run test:bestiary:e2e` plays those systems in the browser.
 
 `npm run test:visual` is the Playwright gameplay/showcase gate against the production preview. It verifies that the imported hero, normal enemies, boss, ruin set and nature layer actually attach, then drives the real combat state machine and captures:
 
