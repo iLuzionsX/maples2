@@ -3,17 +3,18 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
 import { Character } from './Character.js';
 import { Enemy } from './Enemy.js';
+import { publicAsset } from './publicAsset.js';
 
 const loader = new GLTFLoader();
 const cache = new Map();
 const V = THREE.Vector3;
 
 const ASSETS = {
-  hero: '/assets/characters/rowan-knight.glb',
-  demon: '/assets/monsters/thornmaw-demon.glb',
-  ghost: '/assets/monsters/briar-ghost.glb',
-  skeleton: '/assets/monsters/briar-skeleton.glb',
-  bat: '/assets/monsters/briar-bat.glb',
+  hero: publicAsset('/assets/characters/rowan-knight.glb'),
+  demon: publicAsset('/assets/monsters/thornmaw-demon.glb'),
+  ghost: publicAsset('/assets/monsters/briar-ghost.glb'),
+  skeleton: publicAsset('/assets/monsters/briar-skeleton.glb'),
+  bat: publicAsset('/assets/monsters/briar-bat.glb'),
 };
 
 const PLAYER_CLIPS = {
