@@ -26,6 +26,10 @@ The encounter combines authored gameplay with locally vendored GLTF art:
 
 All third-party 3D art used by this branch is shipped locally in `public/assets/`; provenance and CC0 licensing are documented in [`THIRD_PARTY_ASSETS.md`](./THIRD_PARTY_ASSETS.md). No external model CDN is required at runtime.
 
+## Play
+
+The current glade is published at https://iluzionsx.github.io/maples2/
+
 ## Run locally
 
 ```bash
