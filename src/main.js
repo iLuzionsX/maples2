@@ -19,6 +19,7 @@ import { installPerformanceExtensions } from './game/PerformanceExtensions.js';
 import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
 import { installCameraPitchControls } from './game/CameraPitchControls.js';
+import { installInsaneLook } from './game/InsaneLook.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -37,6 +38,7 @@ const rowanAnimationDirector = installRowanAnimationDirector(game);
 installRowanRigCompatibility(game, rowanAnimationDirector);
 installFrameInvariantRowanTransitions(game, rowanAnimationDirector);
 installShowcaseQualityGate(game);
+const insaneLook = installInsaneLook(game);
 // Zero-quality-loss FPS pass remains opt-out only for deterministic A/B validation and final handoff validation.
 const performanceDisabled = new URLSearchParams(location.search).get('perf') === 'off';
 const performancePass = performanceDisabled ? null : installPerformancePass(game);
@@ -60,7 +62,8 @@ function waitForCoreVisuals(timeoutMs = 15000) {
   });
 }
 
-Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise]).then(async () => {
+Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise, insaneLook.ready]).then(async () => {
+  insaneLook.dress(game.scene);
   if (performancePass) {
     performancePass.rebatch();
     performanceExtensions?.freezeStaticDecor();

@@ -65,6 +65,27 @@ Used in Maples:
 
 A copy of the upstream license is stored at `public/assets/licenses/KAYKIT_DUNGEON_LICENSE.txt`.
 
+## Poly Haven — meadow light and surface detail
+
+Creator: Poly Haven contributors  
+Source: [polyhaven.com](https://polyhaven.com)  
+License: Creative Commons Zero (CC0 1.0).
+
+Used for image-based reflections and close-up surface detail:
+
+- `public/assets/look/meadow_1k.hdr` — Meadow 1K HDRI, the glade's reflection environment
+- `public/assets/look/leafy_grass_nor_gl_1k.jpg`
+- `public/assets/look/leafy_grass_rough_1k.jpg`
+- `public/assets/look/leafy_grass_ao_1k.jpg`
+- `public/assets/look/mossy_rock_nor_gl_1k.jpg`
+
+## Three.js — water normal map
+
+Source: `mrdoob/three.js` `examples/textures/waternormals.jpg` (r179)  
+License: MIT. Copyright (c) 2010-2026 three.js authors.
+
+- `public/assets/look/waternormals.jpg` — scrolling normal map for the stream and puddles
+
 ## Asset inventory
 
 `docs/asset-inventory.json` records the vendored character, monster and dungeon GLBs' byte sizes, bounds, node names, skins and animation clip names. It is generated from the actual binary files and is used as an integration reference rather than relying on guessed animation names.
