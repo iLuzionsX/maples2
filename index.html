@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#07100f" />
+    <meta name="description" content="Emberfall — a stylized Three.js action RPG vertical slice." />
+    <title>Emberfall — Maples</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.179.1/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.179.1/examples/jsm/"
+        }
+      }
+    </script>
+    <script type="module" crossorigin src="/maples2/assets/index-DQfbYPcY.js"></script>
+    <link rel="stylesheet" crossorigin href="/maples2/assets/index-Bzp6e3zV.css">
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game"></canvas>
+      <div id="hud">
+        <div class="topbar" aria-label="Rowan status">
+          <div class="crest" aria-hidden="true"><span>W</span></div>
+          <div class="identity">
+            <div class="eyebrow">LUMENWOOD WARDEN</div>
+            <div class="name-row"><strong>Rowan</strong><span id="level">Lv. 7</span></div>
+            <div class="bars">
+              <div class="bar hp" aria-label="Health"><i id="hp-fill"></i><b id="hp-text">100 / 100</b></div>
+              <div class="bar mana" aria-label="Mana"><i id="mana-fill"></i></div>
+              <div class="bar xp" aria-label="Experience"><i id="xp-fill"></i></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="quest" aria-label="Current objective">
+          <div class="quest-label">OATH IN PROGRESS</div>
+          <div class="quest-title">The Briarbound</div>
+          <div class="quest-copy" id="quest-copy">Drive them out. Skeletons brace, wisps hex, bats dive.</div>
+          <div class="quest-progress"><span id="quest-progress">0 / 8 defeated</span><i><b id="quest-fill"></b></i></div>
+        </div>
+
+        <div id="boss-ui" class="boss-ui hidden">
+          <div class="boss-kicker">ANCIENT WARDEN</div>
+          <div class="boss-name">Thornmaw</div>
+          <div class="boss-bar"><i id="boss-fill"></i></div>
+        </div>
+
+        <div id="combo" class="combo hidden"><strong>3</strong><span>COMBO</span></div>
+        <div id="toast" class="toast"></div>
+        <div id="damage-layer"></div>
+
+        <div class="skills" aria-label="Combat actions">
+          <div class="skill"><kbd>1</kbd><div class="skill-icon slash">✦</div><span>Steel</span><em id="cd-attack"></em></div>
+          <div class="skill"><kbd>Q</kbd><div class="skill-icon ember">◆</div><span>Ember</span><em id="cd-spell"></em></div>
+          <div class="skill"><kbd>SPACE</kbd><div class="skill-icon dodge">➤</div><span>Evade</span><em id="cd-dodge"></em></div>
+        </div>
+
+        <div class="crosshair" aria-hidden="true"><i></i></div>
+        <div class="vignette"></div>
+        <div id="damage-flash"></div>
+
+        <div id="intro" class="intro">
+          <div class="intro-line" aria-hidden="true"></div>
+          <div class="intro-kicker">LUMENWOOD · FIRST OATH</div>
+          <h1>EMBERFALL</h1>
+          <p>The old forest remembers every oath.</p>
+          <button id="enter-btn">Enter the Glade</button>
+          <small>WASD move · Mouse look · LMB attack · Q ember · Space evade · Level-up chooses an oath</small>
+        </div>
+
+        <div id="victory" class="victory hidden">
+          <div class="victory-kicker">OATH FULFILLED</div>
+          <h2>The glade breathes again.</h2>
+          <p>Thornmaw has fallen. The briars loosen their grip — for now.</p>
+          <button id="restart-btn">Return to the Glade</button>
+        </div>
+
+        <div id="oath" class="oath hidden" role="dialog" aria-modal="true" aria-label="Choose an oath">
+          <div class="oath-kicker">THE GLADE OFFERS AN OATH</div>
+          <h2>How does Rowan grow?</h2>
+          <div class="oath-choices">
+            <button type="button" data-oath="steel" aria-label="Steel Oath. Melee hits harder.">
+              <kbd>1</kbd>
+              <strong>Steel Oath</strong>
+              <span>Melee hits harder. A heavy cut still breaks a brace.</span>
+            </button>
+            <button type="button" data-oath="ember" aria-label="Ember Oath. The lance hits harder and costs less mana.">
+              <kbd>2</kbd>
+              <strong>Ember Oath</strong>
+              <span>Ember Lance hits harder and spends less mana.</span>
+            </button>
+            <button type="button" data-oath="warden" aria-label="Warden Oath. Evade returns sooner and lasts longer.">
+              <kbd>3</kbd>
+              <strong>Warden Oath</strong>
+              <span>Evade returns sooner, and the safe beat lasts longer.</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="mobile-controls" class="mobile-controls">
+          <div id="joystick" class="joystick"><div id="joystick-knob"></div></div>
+          <div class="mobile-actions">
+            <button data-action="spell" class="m-spell" aria-label="Ember spell">◆</button>
+            <button data-action="dodge" class="m-dodge" aria-label="Evade">➤</button>
+            <button data-action="attack" class="m-attack" aria-label="Attack">✦</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </body>
+</html>
