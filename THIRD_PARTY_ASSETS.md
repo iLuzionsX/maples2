@@ -71,13 +71,12 @@ Creator: Poly Haven contributors
 Source: [polyhaven.com](https://polyhaven.com)  
 License: Creative Commons Zero (CC0 1.0).
 
-Used for image-based reflections and close-up surface detail:
+Used for image-based reflections and close-up surface detail. Color and normal maps are 4K; roughness and ambient occlusion are 2K.
 
-- `public/assets/look/meadow_1k.hdr` — Meadow 1K HDRI, the glade's reflection environment
-- `public/assets/look/leafy_grass_nor_gl_1k.jpg`
-- `public/assets/look/leafy_grass_rough_1k.jpg`
-- `public/assets/look/leafy_grass_ao_1k.jpg`
-- `public/assets/look/mossy_rock_nor_gl_1k.jpg`
+- `public/assets/look/meadow_4k.hdr` — [Meadow](https://polyhaven.com/a/meadow) 4K HDRI, the glade's reflection environment
+- `public/assets/look/grass_ground_diff_4k.jpg`, `grass_ground_nor_gl_4k.jpg`, `grass_ground_rough_2k.jpg`, `grass_ground_ao_2k.jpg` — [Grass Ground](https://polyhaven.com/a/grass_ground)
+- `public/assets/look/mossy_rock_diff_4k.jpg`, `mossy_rock_nor_gl_4k.jpg`, `mossy_rock_rough_2k.jpg`, `mossy_rock_ao_2k.jpg` — [Mossy Rock](https://polyhaven.com/a/mossy_rock), OpenGL normals
+- `public/assets/look/pine_bark_diff_4k.jpg`, `pine_bark_nor_gl_4k.jpg`, `pine_bark_rough_2k.jpg` — [Pine Bark](https://polyhaven.com/a/pine_bark)
 
 ## Three.js — water normal map
 

@@ -328,12 +328,48 @@ function contactKernel() {
   return kernel;
 }
 
-function configureRepeat(texture, repeatX, repeatY) {
+function configureRepeat(texture, repeatX, repeatY, colorSpace = THREE.NoColorSpace) {
   texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.colorSpace = THREE.NoColorSpace;
+  texture.colorSpace = colorSpace;
   texture.repeat.set(repeatX, repeatY);
-  texture.anisotropy = 8;
+  texture.anisotropy = 16;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   return texture;
+}
+
+function repeated(cache, texture, repeatX, repeatY) {
+  if (!texture) return null;
+  const key = `${texture.uuid}:${repeatX}:${repeatY}`;
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const copy = texture.clone();
+  copy.repeat.set(repeatX, repeatY);
+  copy.wrapS = copy.wrapT = THREE.RepeatWrapping;
+  copy.needsUpdate = true;
+  cache.set(key, copy);
+  return copy;
+}
+
+function surfaceKind(node, material) {
+  const geometry = node.geometry;
+  const params = geometry?.parameters;
+  const emissive = material.emissive;
+  const glowing = emissive && (emissive.r + emissive.g + emissive.b) > 0.02 && (material.emissiveIntensity ?? 0) > 0.2;
+  if (!params || (material.metalness ?? 0) > 0.25 || glowing) return null;
+  const color = material.color;
+  const brown = Boolean(color && color.r > color.g && color.g > color.b && color.r < 0.55 && color.b < 0.32);
+  if (geometry.type === 'CircleGeometry') return 'grass';
+  if (geometry.type === 'CylinderGeometry') {
+    const radius = params.radiusTop ?? 0;
+    const height = params.height ?? 0;
+    if (radius >= 8) return 'grass';
+    if (brown && radius < 1.2 && height > 0.4) return 'bark';
+    if (!brown && (material.roughness ?? 1) >= 0.85) return 'rock';
+  }
+  if (geometry.type === 'ConeGeometry' && brown) return 'bark';
+  if ((geometry.type === 'BoxGeometry' || geometry.type === 'DodecahedronGeometry') && (material.roughness ?? 1) >= 0.8) return 'rock';
+  return null;
 }
 
 function ensureUv2(geometry) {
@@ -468,25 +504,53 @@ class InsaneLook {
 
   _loadTextures() {
     const loader = new THREE.TextureLoader();
-    const load = (url, repeatX, repeatY) => new Promise(resolve => {
-      loader.load(url, texture => resolve(configureRepeat(texture, repeatX, repeatY)), undefined, () => resolve(null));
+    const srgb = THREE.SRGBColorSpace;
+    const data = THREE.NoColorSpace;
+    const load = (url, colorSpace) => new Promise(resolve => {
+      loader.load(url, texture => resolve(configureRepeat(texture, 1, 1, colorSpace)), undefined, () => resolve(null));
     });
+    this.repeatCache = new Map();
+    this.grassColor = null;
     this.grassNormal = flatDataTexture(128, 128, 255);
     this.grassRough = flatDataTexture(210, 210, 210);
     this.grassAo = flatDataTexture(255, 255, 255);
+    this.rockColor = null;
     this.rockNormal = flatDataTexture(128, 128, 255);
+    this.rockRough = null;
+    this.rockAo = null;
+    this.barkColor = null;
+    this.barkNormal = flatDataTexture(128, 128, 255);
+    this.barkRough = null;
     this.waterNormal = flatDataTexture(128, 128, 255);
     this._texturePromise = Promise.all([
-      load('/assets/look/leafy_grass_nor_gl_1k.jpg', 6, 6),
-      load('/assets/look/leafy_grass_rough_1k.jpg', 6, 6),
-      load('/assets/look/leafy_grass_ao_1k.jpg', 6, 6),
-      load('/assets/look/mossy_rock_nor_gl_1k.jpg', 3.5, 3.5),
-      load('/assets/look/waternormals.jpg', 1, 1),
-    ]).then(([grassNormal, grassRough, grassAo, rockNormal, waterNormal]) => {
+      load('/assets/look/grass_ground_diff_4k.jpg', srgb),
+      load('/assets/look/grass_ground_nor_gl_4k.jpg', data),
+      load('/assets/look/grass_ground_rough_2k.jpg', data),
+      load('/assets/look/grass_ground_ao_2k.jpg', data),
+      load('/assets/look/mossy_rock_diff_4k.jpg', srgb),
+      load('/assets/look/mossy_rock_nor_gl_4k.jpg', data),
+      load('/assets/look/mossy_rock_rough_2k.jpg', data),
+      load('/assets/look/mossy_rock_ao_2k.jpg', data),
+      load('/assets/look/pine_bark_diff_4k.jpg', srgb),
+      load('/assets/look/pine_bark_nor_gl_4k.jpg', data),
+      load('/assets/look/pine_bark_rough_2k.jpg', data),
+      load('/assets/look/waternormals.jpg', data),
+    ]).then(([grassColor, grassNormal, grassRough, grassAo, rockColor, rockNormal, rockRough, rockAo, barkColor, barkNormal, barkRough, waterNormal]) => {
+      const maxAniso = this.game.renderer.capabilities.getMaxAnisotropy?.() || 16;
+      for (const texture of [grassColor, grassNormal, grassRough, grassAo, rockColor, rockNormal, rockRough, rockAo, barkColor, barkNormal, barkRough, waterNormal]) {
+        if (texture) texture.anisotropy = maxAniso;
+      }
+      if (grassColor) this.grassColor = grassColor;
       if (grassNormal) this.grassNormal = grassNormal;
       if (grassRough) this.grassRough = grassRough;
       if (grassAo) this.grassAo = grassAo;
+      if (rockColor) this.rockColor = rockColor;
       if (rockNormal) this.rockNormal = rockNormal;
+      if (rockRough) this.rockRough = rockRough;
+      if (rockAo) this.rockAo = rockAo;
+      if (barkColor) this.barkColor = barkColor;
+      if (barkNormal) this.barkNormal = barkNormal;
+      if (barkRough) this.barkRough = barkRough;
       if (waterNormal) {
         this.waterNormal = waterNormal;
         if (this.game.showcasePass?.waterUniforms?.uNormalMap) {
@@ -517,7 +581,7 @@ class InsaneLook {
     this.scene.environment = provisional.texture;
 
     return new Promise(resolve => {
-      new RGBELoader().load('/assets/look/meadow_1k.hdr', hdr => {
+      new RGBELoader().load('/assets/look/meadow_4k.hdr', hdr => {
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         const target = pmrem.fromEquirectangular(hdr);
         this.scene.environment = target.texture;
@@ -760,13 +824,14 @@ class InsaneLook {
     root.traverse(node => {
       if (!node.isMesh || !node.material || node.userData.mintPuddle || node.userData.mintShaft || node.userData.mintMist) return;
       const materials = Array.isArray(node.material) ? node.material : [node.material];
-      for (const material of materials) this._dressMaterial(material, node.geometry);
+      for (const material of materials) this._dressMaterial(material, node);
     });
   }
 
-  _dressMaterial(material, geometry) {
+  _dressMaterial(material, node) {
     if (!material?.isMeshStandardMaterial) return;
     this._linearizeMaterials(material);
+    const geometry = node.geometry;
     if (material.aoMap) ensureUv2(geometry);
     if (material.userData.mintDressed === 'full') return;
 
@@ -780,25 +845,42 @@ class InsaneLook {
     }
 
     if (!this.texturesReady || material.map || material.userData.mintPuddle) return;
-    const color = material.color;
-    const green = color && color.g > color.r * 0.96 && color.g >= color.b * 0.8;
-    if (green && (material.roughness ?? 1) >= 0.72) {
-      material.normalMap = this.grassNormal;
-      material.normalScale ??= new THREE.Vector2();
-      material.normalScale.set(0.48, 0.48);
-      material.roughnessMap = this.grassRough;
-      material.aoMap = this.grassAo;
-      material.aoMapIntensity = 0.38;
-      material.bumpMap = null;
-      ensureUv2(geometry);
-    } else if ((material.roughness ?? 1) >= 0.86 && (material.metalness ?? 0) < 0.2) {
-      material.normalMap = this.rockNormal;
-      material.normalScale ??= new THREE.Vector2();
-      material.normalScale.set(0.36, 0.36);
-      material.bumpMap = null;
-    }
+    this._applySurfaceKind(material, geometry, surfaceKind(node, material));
     material.needsUpdate = true;
     material.userData.mintDressed = 'full';
+  }
+
+  _applySurfaceKind(material, geometry, kind) {
+    if (kind === 'grass' && this.grassColor) {
+      const span = geometry.type === 'CircleGeometry'
+        ? (geometry.parameters.radius || 1) * 2
+        : (geometry.parameters.radiusTop || 1) * 2;
+      const repeat = span / 2.4;
+      this._assignSurface(material, geometry, this.grassColor, this.grassNormal, this.grassRough, this.grassAo, repeat, repeat, 0.82);
+      return;
+    }
+    if (kind === 'bark' && this.barkColor) {
+      this._assignSurface(material, geometry, this.barkColor, this.barkNormal, this.barkRough, null, 2, 2.6, 0.9);
+      return;
+    }
+    if (kind === 'rock' && this.rockColor) {
+      this._assignSurface(material, geometry, this.rockColor, this.rockNormal, this.rockRough, this.rockAo, 2.2, 2.2, 0.78);
+    }
+  }
+
+  _assignSurface(material, geometry, colorMap, normalMap, roughMap, aoMap, repeatX, repeatY, normalStrength) {
+    material.map = repeated(this.repeatCache, colorMap, repeatX, repeatY);
+    material.color.setHex(0xffffff);
+    material.flatShading = false;
+    material.normalMap = repeated(this.repeatCache, normalMap, repeatX, repeatY);
+    material.normalScale = new THREE.Vector2(normalStrength, normalStrength);
+    material.roughness = 1;
+    material.roughnessMap = roughMap ? repeated(this.repeatCache, roughMap, repeatX, repeatY) : null;
+    material.aoMap = aoMap ? repeated(this.repeatCache, aoMap, repeatX, repeatY) : null;
+    material.aoMapIntensity = aoMap ? 0.72 : 0;
+    material.bumpMap = null;
+    material.envMapIntensity = 0.72;
+    if (aoMap) ensureUv2(geometry);
   }
 
   resize() {
