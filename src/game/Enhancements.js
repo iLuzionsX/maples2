@@ -270,6 +270,8 @@ export function enhanceInstance(game) {
     patch.receiveShadow = true;
     patchGroup.add(patch);
   }
+  // The scanned ground already carries the grass. These low-poly discs sat on top of it as stretched stickers.
+  patchGroup.visible = false;
   game.world.decor.add(patchGroup);
 
   if (game.composer) {

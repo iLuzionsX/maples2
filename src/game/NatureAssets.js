@@ -87,7 +87,7 @@ export async function installNatureAssets(game) {
     const pine = normalize(configureTemplate(pineGltf.scene.clone(true), game.renderer, { castShadow: true }), 6.4);
     const bush = normalize(configureTemplate(bushGltf.scene.clone(true), game.renderer, { castShadow: true }), 1.15);
     const fern = normalize(configureTemplate(fernGltf.scene.clone(true), game.renderer), .72);
-    const grass = normalize(configureTemplate(grassGltf.scene.clone(true), game.renderer), .42);
+    const grass = normalize(configureTemplate(grassGltf.scene.clone(true), game.renderer), .78);
 
     const parent = game.world.decor;
     const random = seededRandom();
@@ -110,6 +110,7 @@ export async function installNatureAssets(game) {
       // Only foreground/near-shrine pines need expensive dynamic shadows.
       let shadowEnabled = i < (high ? 8 : 4);
       instance.traverse(node => { if (node.isMesh) node.castShadow = shadowEnabled; });
+      instance.userData.solidRadius = 0.5 * instance.scale.x;
       manager.instances.push(instance);
     }
 
@@ -127,6 +128,7 @@ export async function installNatureAssets(game) {
         .012 + random() * .01
       );
       instance.traverse(node => { if (node.isMesh) node.castShadow = i < 5 && high; });
+      instance.userData.solidRadius = 0.46 * instance.scale.x;
       manager.instances.push(instance);
     }
 
@@ -145,7 +147,7 @@ export async function installNatureAssets(game) {
       ));
     }
 
-    const grassCount = high ? 36 : 18;
+    const grassCount = high ? 72 : 32;
     for (let i = 0; i < grassCount; i++) {
       const angle = random() * Math.PI * 2;
       const radius = 3.2 + random() * 20.5;
@@ -158,6 +160,8 @@ export async function installNatureAssets(game) {
         'grass',
         .025 + random() * .025
       ));
+      const tuft = manager.instances[manager.instances.length - 1];
+      tuft.userData.solidRadius = 0;
     }
 
     manager.count = manager.instances.length;

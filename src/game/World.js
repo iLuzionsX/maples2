@@ -91,7 +91,9 @@ export class World {
     for(let i=0;i<(this.quality==='high'?34:20);i++){
       const a=Math.random()*Math.PI*2, r=7+Math.random()*21;
       const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(.3+Math.random()*.7,0),rockMat);
-      rock.position.set(Math.cos(a)*r,.12,Math.sin(a)*r); rock.scale.set(1,.6+Math.random()*.8,.8+Math.random()*.7); rock.rotation.set(Math.random(),Math.random()*6,Math.random()); rock.castShadow=true; rock.receiveShadow=true; this.decor.add(rock);
+      rock.position.set(Math.cos(a)*r,.12,Math.sin(a)*r); rock.scale.set(1,.6+Math.random()*.8,.8+Math.random()*.7); rock.rotation.set(Math.random(),Math.random()*6,Math.random()); rock.castShadow=true; rock.receiveShadow=true;
+      rock.userData.solidRadius = rock.geometry.parameters.radius * Math.max(rock.scale.x, rock.scale.z) * 0.92;
+      this.decor.add(rock);
     }
     for(let i=0;i<(this.quality==='high'?50:28);i++) this._plant(i);
     for(let i=0;i<9;i++) this._crystal(i);
@@ -117,6 +119,7 @@ export class World {
       const lantern=new THREE.Mesh(new THREE.SphereGeometry(.08,8,6),new THREE.MeshBasicMaterial({color:0xffd783}));
       lantern.position.set(.65,3.05,.2); g.add(lantern);
     }
+    g.userData.solidRadius = 0.58 * s;
     this.decor.add(g);
   }
 
@@ -144,6 +147,7 @@ export class World {
       const shard=new THREE.Mesh(new THREE.OctahedronGeometry(.28+Math.random()*.18,0),new THREE.MeshStandardMaterial({color:c,roughness:.25,emissive:c,emissiveIntensity:.35,flatShading:true}));
       shard.scale.y=2+Math.random()*1.6; shard.position.set((j-1)*.28,.45+Math.random()*.2,(Math.random()-.5)*.25); shard.rotation.z=(j-1)*.18; shard.castShadow=true; g.add(shard);
     }
+    g.userData.solidRadius = 0.42;
     this.decor.add(g);
   }
 
@@ -154,6 +158,7 @@ export class World {
     makeColumn(-1.7,0,2.6);makeColumn(1.7,0,1.75);
     const arch=new THREE.Mesh(new THREE.BoxGeometry(4.2,.42,.75),stone);arch.position.set(0,3.1,0);arch.rotation.z=.05;arch.castShadow=true;g.add(arch);
     const mossStrip=new THREE.Mesh(new THREE.BoxGeometry(2.4,.09,.79),moss);mossStrip.position.set(-.7,3.33,.02);g.add(mossStrip);
+    g.userData.solidOffsets = [[-1.7, 0, 0.72], [1.7, 0, 0.62]];
     this.decor.add(g);
   }
 
@@ -166,6 +171,7 @@ export class World {
     }
     const ob=new THREE.Mesh(new THREE.CylinderGeometry(.42,.65,3.6,6),stone);ob.position.y=2.7;ob.castShadow=true;g.add(ob);
     const rune=new THREE.Mesh(new THREE.TorusGeometry(.55,.06,6,24),gold);rune.position.set(0,3.0,.42);g.add(rune);
+    g.userData.solidRadius = 2.15;
     this.decor.add(g);
   }
 
@@ -220,5 +226,22 @@ export class World {
   clampToArena(pos){
     const d=Math.hypot(pos.x,pos.z);
     if(d>this.arenaRadius){ const s=this.arenaRadius/d; pos.x*=s;pos.z*=s; }
+  }
+
+  collide(pos, radius = 0.45) {
+    this.collision?.resolve(pos, radius);
+    this.clampToArena(pos);
+  }
+
+  separate(pos, radius, other, otherRadius) {
+    this.collision?.separate(pos, radius, other, otherRadius);
+  }
+
+  separateBoth(a, aRadius, b, bRadius) {
+    this.collision?.separateBoth(a, aRadius, b, bRadius);
+  }
+
+  blocked(x, z, radius = 0.2) {
+    return this.collision ? this.collision.overlaps(x, z, radius) : false;
   }
 }

@@ -20,6 +20,7 @@ import { installNatureInstancing } from './game/NatureInstancing.js';
 import { installMobileCameraControls } from './game/MobileCameraControls.js';
 import { installCameraPitchControls } from './game/CameraPitchControls.js';
 import { installInsaneLook } from './game/InsaneLook.js';
+import { installCollision } from './game/Collision.js';
 
 const canvas = document.querySelector('#game');
 const game = new Game(canvas);
@@ -69,6 +70,7 @@ Promise.allSettled([waitForCoreVisuals(), environmentPromise, naturePromise, ins
     performanceExtensions?.freezeStaticDecor();
     await installNatureInstancing(game);
   }
+  installCollision(game);
   enterButton.textContent = 'Enter the Glade';
   enterButton.disabled = false;
   enterButton.dataset.ready = 'true';

@@ -103,25 +103,29 @@ const OPTICS_SHADER = {
       return (uNear * uFar) / ((uFar - uNear) * depth - uFar);
     }
 
-    vec3 sampleColor(vec2 uv) {
-      vec3 s = texture2D(tDiffuse, uv).rgb;
-      float luma = dot(s, vec3(0.2126, 0.7152, 0.0722));
-      return s * (1.0 + smoothstep(1.15, 2.6, luma) * 1.35);
+    float cocAt(vec2 uv) {
+      float z = viewZ(texture2D(tDepth, uv).x);
+      float delta = z - uFocus;
+      float nearCoc = max(delta - 3.6, 0.0) * 0.34;
+      float farCoc = max(-delta - 6.5, 0.0) * 0.16;
+      return clamp(max(nearCoc, farCoc) * uCoCScale, 0.0, uMaxCoC);
     }
 
     void main() {
       float depth = texture2D(tDepth, vUv).x;
       float z = viewZ(depth);
-      float coc = clamp(abs(z - uFocus) * uCoCScale, 0.0, uMaxCoC);
+      float coc = cocAt(vUv);
       vec3 accum = texture2D(tDiffuse, vUv).rgb;
       float weight = 1.0;
-      if (coc > 0.45) {
+      if (coc > 0.65) {
         for (int i = 0; i < 11; i++) {
           float a = float(i) * 2.39996323;
           float r = sqrt((float(i) + 0.5) / 11.0);
-          vec2 off = vec2(cos(a), sin(a)) * r * coc * uTexel;
-          accum += sampleColor(vUv + off);
-          weight += 1.0;
+          vec2 suv = vUv + vec2(cos(a), sin(a)) * r * coc * uTexel;
+          float sampleCoc = cocAt(suv);
+          float w = smoothstep(0.25, 1.4, max(coc, sampleCoc));
+          accum += texture2D(tDiffuse, suv).rgb * w;
+          weight += w;
         }
       }
       vec3 col = accum / weight;
@@ -359,7 +363,7 @@ function surfaceKind(node, material) {
   if (!params || (material.metalness ?? 0) > 0.25 || glowing) return null;
   const color = material.color;
   const brown = Boolean(color && color.r > color.g && color.g > color.b && color.r < 0.55 && color.b < 0.32);
-  if (geometry.type === 'CircleGeometry') return 'grass';
+  if (geometry.type === 'CircleGeometry' && (params.radius ?? 0) >= 8) return 'grass';
   if (geometry.type === 'CylinderGeometry') {
     const radius = params.radiusTop ?? 0;
     const height = params.height ?? 0;
@@ -370,6 +374,29 @@ function surfaceKind(node, material) {
   if (geometry.type === 'ConeGeometry' && brown) return 'bark';
   if ((geometry.type === 'BoxGeometry' || geometry.type === 'DodecahedronGeometry') && (material.roughness ?? 1) >= 0.8) return 'rock';
   return null;
+}
+
+const _uvPoint = new THREE.Vector3();
+
+function writeWorldUv(mesh, tile) {
+  const geometry = mesh.geometry;
+  if (!geometry?.attributes?.position || geometry.userData.worldGrassTile === tile) return;
+  mesh.updateWorldMatrix(true, false);
+  const position = geometry.attributes.position;
+  let uv = geometry.attributes.uv;
+  if (!uv || uv.count !== position.count) {
+    uv = new THREE.BufferAttribute(new Float32Array(position.count * 2), 2);
+    geometry.setAttribute('uv', uv);
+  }
+  for (let i = 0; i < position.count; i++) {
+    _uvPoint.fromBufferAttribute(position, i);
+    mesh.localToWorld(_uvPoint);
+    uv.setXY(i, _uvPoint.x / tile, _uvPoint.z / tile);
+  }
+  uv.needsUpdate = true;
+  geometry.deleteAttribute('uv2');
+  geometry.setAttribute('uv2', uv.clone());
+  geometry.userData.worldGrassTile = tile;
 }
 
 function ensureUv2(geometry) {
@@ -783,8 +810,8 @@ class InsaneLook {
     this.contactPass.enabled = this.high;
     this.opticsPass = makePass(OPTICS_SHADER);
     this.opticsPass.uniforms.tDepth.value = this.depthTexture;
-    this.opticsPass.uniforms.uCoCScale.value = this.high ? 1.25 : 0.48;
-    this.opticsPass.uniforms.uMaxCoC.value = this.high ? 24 : 8;
+    this.opticsPass.uniforms.uCoCScale.value = this.high ? 1 : 0.55;
+    this.opticsPass.uniforms.uMaxCoC.value = this.high ? 6.5 : 3.2;
     this.opticsPass.uniforms.uGodray.value = this.high ? 0.09 : 0.03;
     this.finishPass = makePass(FINISH_SHADER);
     this.finishPass.uniforms.tGrain.value = grainTexture();
@@ -845,18 +872,16 @@ class InsaneLook {
     }
 
     if (!this.texturesReady || material.map || material.userData.mintPuddle) return;
-    this._applySurfaceKind(material, geometry, surfaceKind(node, material));
+    this._applySurfaceKind(material, node, surfaceKind(node, material));
     material.needsUpdate = true;
     material.userData.mintDressed = 'full';
   }
 
-  _applySurfaceKind(material, geometry, kind) {
+  _applySurfaceKind(material, node, kind) {
+    const geometry = node.geometry;
     if (kind === 'grass' && this.grassColor) {
-      const span = geometry.type === 'CircleGeometry'
-        ? (geometry.parameters.radius || 1) * 2
-        : (geometry.parameters.radiusTop || 1) * 2;
-      const repeat = span / 2.4;
-      this._assignSurface(material, geometry, this.grassColor, this.grassNormal, this.grassRough, this.grassAo, repeat, repeat, 0.82);
+      writeWorldUv(node, 2.2);
+      this._assignSurface(material, node.geometry, this.grassColor, this.grassNormal, this.grassRough, this.grassAo, 1, 1, 0.46);
       return;
     }
     if (kind === 'bark' && this.barkColor) {
