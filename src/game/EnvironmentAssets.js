@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { publicAsset } from './publicAsset.js';
 
 const loader = new GLTFLoader();
 const cache = new Map();
 
 const ENV = {
-  arch: '/assets/environment/glade-arch.glb',
-  brokenWall: '/assets/environment/ruin-wall-broken.glb',
-  pillar: '/assets/environment/ruin-pillar.glb',
-  stairs: '/assets/environment/shrine-stairs.glb',
-  torch: '/assets/environment/torch-lit.glb',
+  arch: publicAsset('/assets/environment/glade-arch.glb'),
+  brokenWall: publicAsset('/assets/environment/ruin-wall-broken.glb'),
+  pillar: publicAsset('/assets/environment/ruin-pillar.glb'),
+  stairs: publicAsset('/assets/environment/shrine-stairs.glb'),
+  torch: publicAsset('/assets/environment/torch-lit.glb'),
 };
 
 function load(url) {

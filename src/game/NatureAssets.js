@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { publicAsset } from './publicAsset.js';
 
 const loader = new GLTFLoader();
 const V = THREE.Vector3;
 const cache = new Map();
 
 const NATURE = {
-  pine: '/assets/nature/lumen-pine.glb',
-  bush: '/assets/nature/flowering-bush.glb',
-  fern: '/assets/nature/fern.glb',
-  grass: '/assets/nature/wispy-grass.glb',
+  pine: publicAsset('/assets/nature/lumen-pine.glb'),
+  bush: publicAsset('/assets/nature/flowering-bush.glb'),
+  fern: publicAsset('/assets/nature/fern.glb'),
+  grass: publicAsset('/assets/nature/wispy-grass.glb'),
 };
 
 function load(url) {
