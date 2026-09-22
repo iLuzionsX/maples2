@@ -6,6 +6,7 @@ import { TexturePass } from 'three/addons/postprocessing/TexturePass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { publicAsset } from './publicAsset.js';
 
 const V = THREE.Vector3;
 const TAU = Math.PI * 2;
@@ -550,18 +551,18 @@ class InsaneLook {
     this.barkRough = null;
     this.waterNormal = flatDataTexture(128, 128, 255);
     this._texturePromise = Promise.all([
-      load('/assets/look/grass_ground_diff_4k.jpg', srgb),
-      load('/assets/look/grass_ground_nor_gl_4k.jpg', data),
-      load('/assets/look/grass_ground_rough_2k.jpg', data),
-      load('/assets/look/grass_ground_ao_2k.jpg', data),
-      load('/assets/look/mossy_rock_diff_4k.jpg', srgb),
-      load('/assets/look/mossy_rock_nor_gl_4k.jpg', data),
-      load('/assets/look/mossy_rock_rough_2k.jpg', data),
-      load('/assets/look/mossy_rock_ao_2k.jpg', data),
-      load('/assets/look/pine_bark_diff_4k.jpg', srgb),
-      load('/assets/look/pine_bark_nor_gl_4k.jpg', data),
-      load('/assets/look/pine_bark_rough_2k.jpg', data),
-      load('/assets/look/waternormals.jpg', data),
+      load(publicAsset('/assets/look/grass_ground_diff_4k.jpg'), srgb),
+      load(publicAsset('/assets/look/grass_ground_nor_gl_4k.jpg'), data),
+      load(publicAsset('/assets/look/grass_ground_rough_2k.jpg'), data),
+      load(publicAsset('/assets/look/grass_ground_ao_2k.jpg'), data),
+      load(publicAsset('/assets/look/mossy_rock_diff_4k.jpg'), srgb),
+      load(publicAsset('/assets/look/mossy_rock_nor_gl_4k.jpg'), data),
+      load(publicAsset('/assets/look/mossy_rock_rough_2k.jpg'), data),
+      load(publicAsset('/assets/look/mossy_rock_ao_2k.jpg'), data),
+      load(publicAsset('/assets/look/pine_bark_diff_4k.jpg'), srgb),
+      load(publicAsset('/assets/look/pine_bark_nor_gl_4k.jpg'), data),
+      load(publicAsset('/assets/look/pine_bark_rough_2k.jpg'), data),
+      load(publicAsset('/assets/look/waternormals.jpg'), data),
     ]).then(([grassColor, grassNormal, grassRough, grassAo, rockColor, rockNormal, rockRough, rockAo, barkColor, barkNormal, barkRough, waterNormal]) => {
       const maxAniso = this.game.renderer.capabilities.getMaxAnisotropy?.() || 16;
       for (const texture of [grassColor, grassNormal, grassRough, grassAo, rockColor, rockNormal, rockRough, rockAo, barkColor, barkNormal, barkRough, waterNormal]) {
@@ -608,7 +609,7 @@ class InsaneLook {
     this.scene.environment = provisional.texture;
 
     return new Promise(resolve => {
-      new RGBELoader().load('/assets/look/meadow_4k.hdr', hdr => {
+      new RGBELoader().load(publicAsset('/assets/look/meadow_4k.hdr'), hdr => {
         hdr.mapping = THREE.EquirectangularReflectionMapping;
         const target = pmrem.fromEquirectangular(hdr);
         this.scene.environment = target.texture;
