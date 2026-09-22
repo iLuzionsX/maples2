@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "id": "vfx-first-principles",
+  "enabled": true,
+  "mode": "implementation",
+  "objective": "Rebuild Maples' particles and gameplay effects from first principles. The owner dislikes the current VFX and considers them cheap. Replace the current primitive/confetti-like visual language with an expensive, artistic, authored combat-effects system: layered and intersecting motion, deliberate silhouettes, ribbons/arcs/shockwaves, coherent core/edge/mote structure, directional impacts, elegant temporal staging, and strong spatial composition. Treat the existing FX implementation as a behavioral reference only, not a style reference. Preserve gameplay authority and public behavior while making melee slashes, hits, projectile travel/impact, dodge, spawn/death, boss awakening, healing/level-up and related feedback feel premium and original.",
+  "role": "principal real-time VFX artist-engineer and Three.js rendering engineer for a commercial-indie action RPG",
+  "allowed_files": [
+    "src/game/FX.js",
+    "src/game/Game.js",
+    "src/game/Character.js",
+    "src/game/Enemy.js",
+    "tests/vfx-production-unit.mjs"
+  ],
+  "relevant_context": "Start from the current repaired main baseline. Do not use old VFX PRs as a style source. Do not inherit the prior simple torus/ring + tetrahedron/cone particle aesthetic. 'Intersecting' means composed layers that cross and interact visually: paired/counter-rotating arcs, ribbon strokes, layered impact planes, interference rings, directional spark fans and clustered motes with intentional negative space rather than random uniform spray. Prefer procedural/runtime-generated textures, shaders, instancing, pooling, shared geometry/materials, or batched point/ribbon systems over one MeshBasicMaterial allocation per particle. Preserve exact combat numbers, cooldowns, hit windows, enemy AI, movement, input, camera authority, UI, licensed assets and game progression. High quality should look showcase-grade; low quality/mobile must remain readable and performant rather than merely deleting essential feedback. Avoid copyrighted franchise-specific visual motifs; keep the style original to Maples/Lumenwood.",
+  "acceptance_criteria": [
+    "Replace the current cheap primitive/confetti visual language rather than merely increasing particle count, opacity, emissive intensity or bloom.",
+    "Create a coherent VFX grammar with authored timing phases such as anticipation, contact/peak and dissipating aftermath.",
+    "Melee slashes and impacts use directional, combo-aware layered/intersecting forms with clear silhouettes and readable contact.",
+    "Projectile launch/travel/impact feels continuous and sculpted, with a visually related trail, core and explosion language.",
+    "Dodge, enemy spawn/death, boss awakening and level-up effects are visually distinct but belong to the same art system.",
+    "Use performance-conscious pooling/batching/shared resources and hard caps; avoid per-frame geometry/material churn and unbounded allocations.",
+    "Provide explicit high/low quality budgets so mobile preserves essential shapes and timing at reduced density.",
+    "Clean up generated resources and expired effects without leaks or stale scene objects.",
+    "Do not alter combat damage, cooldowns, hit timing, movement, enemy AI, camera/input authority, UI contracts or progression values.",
+    "Add focused unit coverage in tests/vfx-production-unit.mjs for quality budgets/resource reuse/public VFX contracts or other testable invariants introduced by the implementation.",
+    "Run the approved build and regression commands and report measured results separately from assumptions.",
+    "Return a bounded unified diff only inside the allowlist, plus concise risks and visual/performance validation notes for Sol review."
+  ],
+  "commands": [
+    "npm run build",
+    "npm run test:movement:unit",
+    "npm run test:animation:unit",
+    "npm run test:mobile:unit",
+    "node tests/enemy-facing-unit.mjs"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 16,
+  "max_tokens": 52000,
+  "timeout_ms": 720000,
+  "max_changed_files": 5,
+  "max_patch_bytes": 196608,
+  "retries": 3,
+  "stream": true
+}
