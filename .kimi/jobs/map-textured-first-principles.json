@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "map-textured-first-principles-20260830",
+  "enabled": true,
+  "mode": "implementation",
+  "objective": "Rebuild Maples' playable world/map from first principles. The owner rejects the current environment as toy-like, cheap, low-effort and visually generic. Do not polish the existing circular diorama; use it only to preserve gameplay contracts. Replace the current flat disc/radial-prop/primitive-cliff language with an expensive, authored, artistic fantasy environment that feels like one real place from gameplay camera angles. Use textures and materially rich surface treatment as a core part of the redesign, not as an afterthought. The finished direction should feel commercially art-directed: asymmetrical macro terrain, memorable landmark hierarchy, layered depth, continuous terrain transitions, embedded ruins/nature/shrine, ecological foliage composition, deliberate negative space, believable surface scale, atmospheric separation and dense-but-controlled detail. Preserve Maples/Lumenwood identity while remaining original and not copying MapleStory, D&D or any other franchise.",
+  "role": "principal environment artist, technical level artist, material artist and Three.js rendering engineer for a commercial-indie action RPG",
+  "allowed_files": [
+    "src/game/World.js",
+    "src/game/ShowcasePass.js",
+    "src/game/EnvironmentAssets.js",
+    "src/game/NatureAssets.js",
+    "tests/world-art-direction-unit.mjs"
+  ],
+  "relevant_context": "Start strictly from current main fcd928cf43ff345eb9d09f0332ba79c64af39647 and ignore all older open world/map PRs as implementation sources. Current World.js visibly uses a cylinder/circle arena, flat-shaded primitive terrain, radial trees, uniform random rocks/plants/crystals and blocky procedural ruins. ShowcasePass surrounds it with repeated dodecahedron cliff shelves, cylinder terraces and cone mountains. EnvironmentAssets/NatureAssets add licensed KayKit/Quaternius GLBs but currently read as layers placed on top of the primitive base. The owner explicitly wants a from-zero environment rethink and explicitly requires textures. Preserve Rowan/enemy movement and combat authority, encounter coordinates, boss trigger, portal functionality/unlock behavior, camera/input/UI/progression, public asset-manager readiness/failure contracts, asset licensing, PerformancePass rebatching, NatureInstancing compatibility and mobile playability. Keep the central traversable gameplay surface mechanically compatible even if its visual terrain is completely re-authored around/over it. Use deterministic seeded composition. Reuse existing licensed assets where useful but recontextualize and material-tune them so the world does not read like an asset-pack showroom. For textures, prefer original procedural CanvasTexture/DataTexture/shader-generated detail or already-licensed local asset textures available through the existing GLBs. Build shared reusable material/texture resources; do not generate per-object textures. Use texture repeat/rotation/scale intentionally, correct color-space handling, anisotropy where supported, and quality-aware texture resolution. Aim for layered albedo/detail breakup and roughness/normal-like surface variation on soil, moss, worn stone, roots/wood and foliage. If a full normal map is impractical in the allowlist, implement convincing shader/procedural micro-normal or roughness variation rather than falling back to flat color. Avoid giant unique textures, web downloads, unlicensed images, runtime network dependencies, obvious tiling at gameplay distance, excessive bloom/emissive clutter, primitive silhouettes, evenly spaced radial layouts and unbounded allocations.",
+  "acceptance_criteria": [
+    "The map no longer reads as a circular toy arena/diorama or a ring of evenly scattered props; the macro silhouette is authored, asymmetrical and intentional.",
+    "Remove, replace or convincingly bury/disguise the obvious cylinder ground, circle overlay, repeated cone mountains, dodecahedron cliff beads, cylinder terraces and icosahedron tree/cloud blob language rather than increasing primitive counts.",
+    "Create one dominant memorable environmental landmark plus secondary landmarks that establish a clear visual route and foreground/midground/background hierarchy.",
+    "The traversable combat space remains mechanically compatible, but visually reads as part of a larger continuous terrain formation instead of a flat arena disc.",
+    "Use textures materially: soil, moss/groundcover, worn stone, roots/wood and foliage must have visibly differentiated surface breakup through shared albedo/detail textures plus roughness and normal-like variation or equivalent shaders/procedural maps.",
+    "Texture resources are deterministic, reusable and performance-conscious: no per-frame regeneration, no per-object unique texture spam, sensible resolution caps, repeat/anisotropy/color-space handling and high/low quality budgets.",
+    "Ruins, shrine/portal, foliage and terrain feel embedded through grading, grounding, edge transitions, debris/roots/moss or terrain overlap instead of sitting on top of the map as separate props.",
+    "Foliage follows ecological clustering, edge framing, local density gradients and deliberate openings rather than uniform radial scatter; low quality preserves the same composition with reduced density.",
+    "Lighting and atmosphere create depth/focal hierarchy without depending on excessive emissive intensity; mobile/low quality remains readable.",
+    "Preserve portal position/functionality and all gameplay-critical coordinate contracts unless a purely decorative transform leaves mechanics unchanged.",
+    "Remain compatible with EnvironmentAssets, NatureAssets, PerformancePass rebatching and NatureInstancing; avoid unbounded allocations, per-frame geometry/material churn and excessive shadow casters.",
+    "Use deterministic seeded placement and expose testable composition/material budget constants or invariants.",
+    "Add focused tests in tests/world-art-direction-unit.mjs covering deterministic composition, texture/material budgets, high/low quality constraints and preservation of gameplay-critical world contracts.",
+    "Run all approved build/regression commands and report measured pass/fail results separately from visual assumptions. Identify any visual/performance checks that still require Sol/owner play-testing.",
+    "Return a bounded unified diff only inside the allowlist, with a concise visual/material rationale, performance risks, texture-memory considerations and validation notes for Sol review."
+  ],
+  "commands": [
+    "npm run build",
+    "npm run test:movement:unit",
+    "npm run test:animation:unit",
+    "npm run test:mobile:unit",
+    "node tests/enemy-facing-unit.mjs",
+    "node tests/world-art-direction-unit.mjs"
+  ],
+  "requested_output": "structured_patch",
+  "reasoning_effort": "max",
+  "max_turns": 22,
+  "max_tokens": 70000,
+  "timeout_ms": 720000,
+  "max_changed_files": 5,
+  "max_patch_bytes": 327680,
+  "retries": 3,
+  "stream": true
+}
