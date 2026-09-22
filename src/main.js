@@ -11,6 +11,7 @@ import { installRowanStyle } from './game/RowanStyle.js';
 import { installShowcasePass } from './game/ShowcasePass.js';
 import { installAnimationPolish } from './game/AnimationPolish.js';
 import { installRowanAnimationDirector } from './game/RowanAnimationDirector.js';
+import { installAnimationVFXNextLevel } from './game/AnimationVFXNextLevel.js';
 import { installRowanRigCompatibility } from './game/RowanRigCompatibility.js';
 import { installFrameInvariantRowanTransitions } from './game/RowanTransitionGuard.js';
 import { installShowcaseQualityGate } from './game/ShowcaseQualityGate.js';
@@ -36,6 +37,7 @@ installAnimationPolish(game);
 const rowanAnimationDirector = installRowanAnimationDirector(game);
 installRowanRigCompatibility(game, rowanAnimationDirector);
 installFrameInvariantRowanTransitions(game, rowanAnimationDirector);
+installAnimationVFXNextLevel(game, rowanAnimationDirector);
 installShowcaseQualityGate(game);
 // Zero-quality-loss FPS pass remains opt-out only for deterministic A/B validation and final handoff validation.
 const performanceDisabled = new URLSearchParams(location.search).get('perf') === 'off';
