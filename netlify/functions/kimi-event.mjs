@@ -36,6 +36,19 @@ function sanitize(value, depth = 0) {
   return String(value).slice(0, 1000);
 }
 
+function updateFeatureContext(next, data = {}) {
+  const featurePr = Number(data.feature_pr);
+  if (Number.isInteger(featurePr) && featurePr > 0) {
+    next.feature_pr = featurePr;
+    next.metadata = { ...(next.metadata || {}), feature_pr: featurePr };
+  }
+  if (data.feature_branch) {
+    const featureBranch = String(data.feature_branch).slice(0, 240);
+    next.feature_branch = featureBranch;
+    next.metadata = { ...(next.metadata || {}), feature_branch: featureBranch };
+  }
+}
+
 export function applyEvent(previous, event) {
   const state = previous && typeof previous === 'object' ? previous : { schema_version: 1, run_id: event.run_id, events: [] };
   const events = Array.isArray(state.events) ? state.events : [];
@@ -54,6 +67,7 @@ export function applyEvent(previous, event) {
     next.phase_status = 'running';
     next.started_at = event.at;
     next.metadata = { ...(next.metadata || {}), ...(event.metadata || {}), ...data };
+    updateFeatureContext(next, data);
   } else if (event.type === 'turn_completed') {
     next.turns = data.turn ?? next.turns;
     next.usage = data.usage ?? next.usage;
@@ -64,18 +78,25 @@ export function applyEvent(previous, event) {
     next.agent_status = agentStatus;
     next.status = agentStatus;
     next.phase = agentStatus === 'completed' ? 'sol_review' : 'attention';
-    next.phase_status = agentStatus === 'completed' ? 'waiting' : 'attention';
-    next.result = data.result || null;
+    next.phase_status = agentStatus === 'completed' ? 'waiting_for_owner' : 'attention';
+    if (data.result && typeof data.result === 'object' && agentStatus === 'completed') {
+      const handoff = 'KIMI COMPLETE · SOL REVIEW WAITING FOR OWNER\nNEXT: Return to ChatGPT and say "review".';
+      const summary = String(data.result.summary || '').trim();
+      next.result = { ...data.result, summary: summary ? `${summary}\n\n${handoff}` : handoff };
+    } else {
+      next.result = data.result || null;
+    }
     next.completed_at = event.at;
   } else if (event.type === 'phase_changed') {
     next.phase = data.phase || next.phase;
     if (data.status) next.phase_status = data.status;
     if (data.message) next.phase_message = data.message;
+    updateFeatureContext(next, data);
   } else if (event.type === 'preview_ready') {
     next.phase = 'owner_playtest';
     next.phase_status = 'ready';
     next.preview_url = data.url || next.preview_url;
-    next.feature_pr = data.feature_pr ?? next.feature_pr;
+    updateFeatureContext(next, data);
   } else if (event.type === 'owner_feedback') {
     next.owner_feedback = { state: data.state || 'changes_requested', message: data.message || '', at: event.at };
     next.phase = data.state === 'approved' ? 'approved' : 'revision';

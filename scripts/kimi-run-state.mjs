@@ -12,7 +12,12 @@ function parse(argv) {
     else if (arg === '--status') out.status = argv[++i];
     else if (arg === '--message') out.message = argv[++i];
     else if (arg === '--preview-url') out.previewUrl = argv[++i];
-    else if (arg === '--feature-pr') out.featurePr = Number(argv[++i]);
+    else if (arg === '--feature-pr') {
+      const featurePr = Number(argv[++i]);
+      if (!Number.isInteger(featurePr) || featurePr < 1) throw new Error('--feature-pr must be a positive integer.');
+      out.featurePr = featurePr;
+    }
+    else if (arg === '--feature-branch') out.featureBranch = String(argv[++i] || '').trim();
     else if (arg === '--owner') out.owner = argv[++i];
     else if (arg === '--telemetry-url') out.telemetryUrl = argv[++i];
     else throw new Error(`Unknown option: ${arg}`);
@@ -32,13 +37,17 @@ async function main() {
     token: telemetryTokenFromEnv(),
     metadata: { supervisor: 'GPT-5.6 Sol', repository: 'iLuzionsX/maples2' },
   });
+  const featureContext = {
+    feature_pr: args.featurePr ?? null,
+    feature_branch: args.featureBranch || null,
+  };
   if (args.previewUrl) {
-    await telemetry.emit('preview_ready', { url: args.previewUrl, feature_pr: args.featurePr || null });
+    await telemetry.emit('preview_ready', { url: args.previewUrl, ...featureContext });
   } else if (args.owner) {
     await telemetry.emit('owner_feedback', { state: args.owner, message: args.message || '' });
   } else {
     if (!args.phase) throw new Error('--phase, --preview-url, or --owner is required.');
-    await telemetry.emit('phase_changed', { phase: args.phase, status: args.status || null, message: args.message || '' });
+    await telemetry.emit('phase_changed', { phase: args.phase, status: args.status || null, message: args.message || '', ...featureContext });
   }
   process.stdout.write(`${JSON.stringify({ ok: true, run_id: runId })}\n`);
 }
