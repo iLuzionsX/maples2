@@ -22,10 +22,8 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout playable branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: cursor/bestiary-oaths-6de6
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

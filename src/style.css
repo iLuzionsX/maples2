@@ -53,8 +53,8 @@ button { -webkit-tap-highlight-color: transparent; }
   z-index: -3;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(3, 7, 7, .34), transparent 18%),
-    linear-gradient(0deg, rgba(3, 7, 7, .26), transparent 20%);
+    linear-gradient(180deg, rgba(10, 32, 28, .16), transparent 16%),
+    linear-gradient(0deg, rgba(8, 26, 24, .14), transparent 18%);
 }
 
 .vignette {
@@ -62,7 +62,7 @@ button { -webkit-tap-highlight-color: transparent; }
   inset: 0;
   z-index: -2;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 45%, transparent 48%, rgba(1, 5, 5, .10) 73%, rgba(1, 4, 4, .46) 118%);
+  background: radial-gradient(circle at 50% 42%, transparent 46%, rgba(14, 42, 38, .05) 72%, rgba(8, 30, 28, .28) 118%);
 }
 
 /* ---------- Player field plate ---------- */
@@ -402,7 +402,7 @@ button:focus-visible { outline: 2px solid var(--brass-bright); outline-offset: 4
 }
 
 @media (max-width: 760px), (pointer: coarse) {
-  #hud::before { background: linear-gradient(180deg, rgba(3,7,7,.28), transparent 16%), linear-gradient(0deg, rgba(3,7,7,.18), transparent 18%); }
+  #hud::before { background: linear-gradient(180deg, rgba(10,32,28,.2), transparent 16%), linear-gradient(0deg, rgba(8,26,24,.14), transparent 18%); }
   .topbar {
     left: max(10px, env(safe-area-inset-left));
     top: max(9px, env(safe-area-inset-top));

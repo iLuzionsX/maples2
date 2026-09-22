@@ -187,7 +187,7 @@ export class Game {
 
     this._handleInput(moveWorld);
     this.player.update(dt, move, this.cameraYaw);
-    this.world.clampToArena(this.player.position);
+    this.world.collide(this.player.position, 0.48);
     if (this.player.attackWindow()) this._resolveMelee();
 
     this._updateEnemies(dt, realDt);
@@ -302,6 +302,10 @@ export class Game {
           if(p.pierce<=0){exploded=true;break;}
         }
       }
+      if (!exploded && this.world.blocked(p.mesh.position.x, p.mesh.position.z, 0.22)) {
+        this.fx.burst(p.mesh.position, 0xff8a55, 12, 3.2, 0.6);
+        exploded = true;
+      }
       if(p.life<=0||exploded){this.scene.remove(p.mesh);p.mesh.geometry.dispose();p.mesh.material.dispose();this.projectiles.splice(i,1);}
     }
   }
@@ -309,7 +313,8 @@ export class Game {
   _updateEnemies(dt, realDt) {
     for (const e of this.enemies) {
       e.update(dt,this.player);
-      this.world.clampToArena(e.position);
+      this.world.collide(e.position, Math.max(0.4, e.radius * 0.82));
+      this.world.separateBoth(e.position, e.radius, this.player.position, 0.48);
 
       if (e.attackEvent && !this.player.dead) {
         const dist=e.position.distanceTo(this.player.position);
@@ -346,9 +351,9 @@ export class Game {
     // soft separation keeps packs readable instead of merging into one blob
     for(let i=0;i<this.enemies.length;i++)for(let j=i+1;j<this.enemies.length;j++){
       const a=this.enemies[i],b=this.enemies[j];if(a.dead||b.dead)continue;
-      const d=a.position.clone().sub(b.position);d.y=0;const len=d.length(),min=a.radius+b.radius+.25;
-      if(len>0&&len<min){d.multiplyScalar((min-len)/len*.035);a.position.add(d);b.position.sub(d);}
+      this.world.separateBoth(a.position, a.radius, b.position, b.radius);
     }
+    this.world.collide(this.player.position, 0.48);
 
     this.enemies=this.enemies.filter(e=>!e.remove);
 

@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { publicAsset } from './publicAsset.js';
 
 const loader = new GLTFLoader();
 const cache = new Map();
 
 const ENV = {
-  arch: '/assets/environment/glade-arch.glb',
-  brokenWall: '/assets/environment/ruin-wall-broken.glb',
-  pillar: '/assets/environment/ruin-pillar.glb',
-  stairs: '/assets/environment/shrine-stairs.glb',
-  torch: '/assets/environment/torch-lit.glb',
+  arch: publicAsset('/assets/environment/glade-arch.glb'),
+  brokenWall: publicAsset('/assets/environment/ruin-wall-broken.glb'),
+  pillar: publicAsset('/assets/environment/ruin-pillar.glb'),
+  stairs: publicAsset('/assets/environment/shrine-stairs.glb'),
+  torch: publicAsset('/assets/environment/torch-lit.glb'),
 };
 
 function load(url) {
@@ -87,9 +88,11 @@ export async function installEnvironmentAssets(game) {
     hideProceduralPortalStone(game.world);
 
     // Shrine silhouette: one authentic four-meter arch, with the old portal magic retained inside it.
-    manager.roots.push(place(parent, archTemplate, {
+    const arch = place(parent, archTemplate, {
       x: 0, y: 0, z: -18, ry: 0, scale: 1.13, name: 'KayKit_Glade_Arch'
-    }));
+    });
+    arch.userData.solidOffsets = [[-1.45, 0, 0.55], [1.45, 0, 0.55]];
+    manager.roots.push(arch);
 
     // A broad stair run pulls the eye from the combat field into the portal composition.
     manager.roots.push(place(parent, stairsTemplate, {
@@ -102,7 +105,9 @@ export async function installEnvironmentAssets(game) {
     ];
     for (const [x, y, z, ry, scale] of pillarPlacements) {
       const model = prep(pillarTemplate.clone(true), 0x728778, .04);
-      manager.roots.push(place(parent, model, { x, y, z, ry, scale, name: 'KayKit_Ruin_Pillar' }));
+      const pillar = place(parent, model, { x, y, z, ry, scale, name: 'KayKit_Ruin_Pillar' });
+      pillar.userData.solidRadius = 0.52 * scale;
+      manager.roots.push(pillar);
     }
 
     const wallPlacements = [
@@ -111,7 +116,9 @@ export async function installEnvironmentAssets(game) {
     ];
     for (const [x, y, z, ry, scale] of wallPlacements) {
       const model = prep(wallTemplate.clone(true), 0x68806e, .05);
-      manager.roots.push(place(parent, model, { x, y, z, ry, scale, name: 'KayKit_Broken_Ruin' }));
+      const wall = place(parent, model, { x, y, z, ry, scale, name: 'KayKit_Broken_Ruin' });
+      wall.userData.solidBox = true;
+      manager.roots.push(wall);
     }
 
     const torches = [
@@ -120,7 +127,9 @@ export async function installEnvironmentAssets(game) {
     ];
     for (const [x, y, z, ry] of torches) {
       const model = torchTemplate.clone(true);
-      manager.roots.push(place(parent, model, { x, y, z, ry, scale: 1.05, name: 'KayKit_Lit_Torch' }));
+      const torch = place(parent, model, { x, y, z, ry, scale: 1.05, name: 'KayKit_Lit_Torch' });
+      torch.userData.solidRadius = 0.28;
+      manager.roots.push(torch);
       addTorchLight(parent, x, y + 1.55, z + .06);
     }
 
