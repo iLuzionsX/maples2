@@ -38,6 +38,7 @@ try {
   await ready();
   await run('node', ['tests/ui-production-desktop-e2e.mjs'], 180000);
   await run('node', ['tests/ui-production-mobile-e2e.mjs'], 180000);
+  await run('node', ['tests/world-expansion-e2e.mjs'], 240000);
 } finally {
   try { process.kill(-preview.pid, 'SIGTERM'); } catch { preview.kill('SIGTERM'); }
 }
